@@ -3,13 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "GLOB LABS — a voxel alien laboratory workspace for Claude",
+  "description": "GLOB LABS \u2014 a voxel alien laboratory workspace for Claude",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode single",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:artifact": "npm run build:single && node scripts/artifactify.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

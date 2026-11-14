@@ -31,8 +31,17 @@ async function load(name: string): Promise<AudioBuffer | null> {
       const c = ensure(); const url = urls[name];
       if (!c || !url) return null;
       try {
-        const res = await fetch(url);
-        const buf = await c.decodeAudioData(await res.arrayBuffer());
+        // data: URIs (single-file/artifact build) are decoded by hand: artifact CSP blocks fetch() of data: URLs.
+        let bytes: ArrayBuffer;
+        if (url.startsWith('data:')) {
+          const b64 = url.slice(url.indexOf(',') + 1);
+          const bin = atob(b64); const u8 = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+          bytes = u8.buffer;
+        } else {
+          bytes = await (await fetch(url)).arrayBuffer();
+        }
+        const buf = await c.decodeAudioData(bytes);
         buffers.set(name, buf);
         return buf;
       } catch { return null; }

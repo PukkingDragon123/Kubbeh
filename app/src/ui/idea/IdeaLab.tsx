@@ -49,7 +49,7 @@ export function IdeaLab({ close }: { arg: unknown; close: () => void }) {
   const [tab, setTab] = useState<'doc' | 'mix' | 'prompt'>('doc');
   const [view, setView] = useState<'chat' | 'board'>('chat');
   const [chat, setChat] = useState<Chat | null>(null);
-  const [, setV] = useState(0);
+  const [rev, setV] = useState(0);
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState('');
   const [say, setSay] = useState(pick(IDLE_LINES));
@@ -167,7 +167,7 @@ export function IdeaLab({ close }: { arg: unknown; close: () => void }) {
               </div>
             ) : (
               <div class="idea-msgs" ref={scroller}>
-                {msgs.map((m) => <IdeaMsg key={m.id} m={m} />)}
+                {msgs.map((m) => <IdeaMsg key={m.id} m={m} rev={rev} />)}
               </div>
             )}
 
@@ -199,7 +199,7 @@ export function IdeaLab({ close }: { arg: unknown; close: () => void }) {
   );
 }
 
-function IdeaMsg({ m }: { m: ChatMessage }) {
+function IdeaMsg({ m }: { m: ChatMessage; rev: number }) {
   if (m.role === 'user') {
     const t = m.blocks.find((b) => b.type === 'text') as { text: string } | undefined;
     const shown = (t?.text ?? '').split('\n\n[Current design doc]')[0].split('\n\n(I edited the doc myself')[0];

@@ -28,6 +28,8 @@ function alienName(kind: ActivityKind, idea: boolean) {
 }
 
 function ToolRow({ b, idea }: { b: Extract<MsgBlock, { type: 'tool' }>; idea: boolean }) {
+  // objects here are mutated in place while streaming; signal-aware components are memoized, so subscribe to the tick
+  void tick.value;
   const [open, setOpen] = useState(false);
   const state = !b.done ? 'run' : b.isError ? 'bad' : 'ok';
   return (
@@ -44,6 +46,8 @@ function ToolRow({ b, idea }: { b: Extract<MsgBlock, { type: 'tool' }>; idea: bo
 }
 
 function Thinking({ b, live }: { b: Extract<MsgBlock, { type: 'thinking' }>; live: boolean }) {
+  // objects here are mutated in place while streaming; signal-aware components are memoized, so subscribe to the tick
+  void tick.value;
   if (!b.text.trim()) return <div class="ws-think quiet"><Icon name="brain" size="sm" /> {live ? 'Thinking…' : 'Thought it through'}</div>;
   return (
     <details class="ws-think" open={live}>
@@ -54,6 +58,8 @@ function Thinking({ b, live }: { b: Extract<MsgBlock, { type: 'thinking' }>; liv
 }
 
 function CloneCard({ b }: { b: Extract<MsgBlock, { type: 'clone' }> }) {
+  // objects here are mutated in place while streaming; signal-aware components are memoized, so subscribe to the tick
+  void tick.value;
   const [open, setOpen] = useState(false);
   return (
     <div class={`ws-clone ${b.status}`}>
@@ -68,6 +74,8 @@ function CloneCard({ b }: { b: Extract<MsgBlock, { type: 'clone' }> }) {
 }
 
 function QuestionBlock({ b, live }: { b: Extract<MsgBlock, { type: 'question' }>; live: boolean }) {
+  // objects here are mutated in place while streaming; signal-aware components are memoized, so subscribe to the tick
+  void tick.value;
   const waiting = live && !b.answer;
   return (
     <div class={`ws-q ${waiting ? 'waiting' : ''}`}>
@@ -116,6 +124,8 @@ async function onCodeAction(e: MouseEvent, projectId?: string) {
 }
 
 function MessageView({ m, i, last }: { m: ChatMessage; i: number; last: boolean }) {
+  // objects here are mutated in place while streaming; signal-aware components are memoized, so subscribe to the tick
+  void tick.value;
   const chat = chatSig.value!;
   const idea = chat.mode === 'idea';
   const [editing, setEditing] = useState(false);
@@ -185,8 +195,9 @@ function MessageView({ m, i, last }: { m: ChatMessage; i: number; last: boolean 
 }
 
 function ChatHeader() {
+  // objects here are mutated in place while streaming; signal-aware components are memoized, so subscribe to the tick
+  void tick.value;
   const chat = chatSig.value!;
-  const proj = projects.value.find((p) => p.id === chat.projectId);
   const ctx = contextEstimate(chat);
   const pol = fullPolicy();
   const [compacting, setCompacting] = useState(false);
@@ -195,7 +206,7 @@ function ChatHeader() {
       <button type="button" class="ws-title" title="Rename" onClick={async () => { const t = await promptBox('Rename chat', chat.title); if (t) { chat.title = t.trim() || chat.title; saveChat(chat); bump(); } }}>
         {chat.mode === 'idea' && <Icon name="idea" size="sm" />}<span class="ellipsis">{chat.title}</span><Icon name="pencil" size="sm" class="dimmer" />
       </button>
-      <select class="select ws-mini" aria-label="Project" value={chat.projectId ?? ''} onChange={(e) => { const v = (e.target as HTMLSelectElement).value; chat.projectId = v || undefined; saveChat(chat); bump(); }}>
+      <select class="select ws-mini hide-sm" aria-label="Project" value={chat.projectId ?? ''} onChange={(e) => { const v = (e.target as HTMLSelectElement).value; chat.projectId = v || undefined; saveChat(chat); bump(); }}>
         <option value="">No project</option>
         {projects.value.filter((p) => !p.archived).map((p) => <option key={p.id} value={p.id}>{p.glyph} {p.name}</option>)}
       </select>
@@ -208,7 +219,6 @@ function ChatHeader() {
         onClick={async () => { setCompacting(true); try { const r = await compactChat(chat); toast(r ? `Compacted ${fmtTokens(r.before)} → ${fmtTokens(r.after)} tokens` : 'Nothing to compact yet', r ? 'good' : 'info'); } catch (e: any) { toast(e?.message ?? 'Compaction failed', 'bad'); } finally { setCompacting(false); bump(); } }}>
         <span class="hide-sm">{compacting ? 'Compacting…' : 'Compact'}</span>
       </Btn>
-      {proj && <span class="chip hide-sm" style={{ color: proj.color }}>{proj.glyph} {proj.name}</span>}
     </div>
   );
 }

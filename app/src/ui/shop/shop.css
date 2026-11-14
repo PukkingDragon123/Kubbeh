@@ -38,8 +38,14 @@
 
 @media (max-width: 860px) {
   .vend { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
-  .vend-side { max-height: 46%; }
-  .vend-detail .big { width: 88px; height: 88px; }
+  .vend-side { max-height: 40%; flex-direction: row; }
+  .vend-coin { flex: none; width: 118px; align-content: start; }
+  .vend-coin .dimmer { display: none; }
+  .vend-balance { font-size: 22px; }
+  .vend-detail { padding: 8px; gap: 6px; }
+  .vend-detail .big { width: 64px; height: 64px; }
+  .vend-detail h3 { font-size: 15px !important; }
+  .vend-detail p { display: none; }
   .vend-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
   .vend-slot .thumb { width: 56px; height: 56px; }
 }

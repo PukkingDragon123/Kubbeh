@@ -15,7 +15,7 @@ function Tank({ level, tier }: { level: number; tier: string }) {
   const color = tier === 'full' ? '#8cf56b' : tier === 'half' ? '#52f2ff' : tier === 'quarter' ? '#ffbe3d' : '#ff5a5a';
   const marks = [0.5, 0.25, 0.1];
   return (
-    <svg viewBox={`0 0 ${W + 60} ${H + 20}`} class="fuel-tank" role="img" aria-label={`Fuel ${Math.round(level * 100)} percent`}>
+    <svg viewBox={`0 0 ${W + 60} ${H + 34}`} class="fuel-tank" role="img" aria-label={`Fuel ${Math.round(level * 100)} percent`}>
       <defs>
         <linearGradient id="ft-glass" x1="0" x2="1"><stop offset="0" stop-color="#ffffff22" /><stop offset=".3" stop-color="#ffffff08" /><stop offset=".85" stop-color="#ffffff14" /><stop offset="1" stop-color="#ffffff05" /></linearGradient>
         <linearGradient id="ft-liquid" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color={color} stop-opacity=".95" /><stop offset="1" stop-color={color} stop-opacity=".55" /></linearGradient>
@@ -46,16 +46,16 @@ function Tank({ level, tier }: { level: number; tier: string }) {
         return (
           <g key={m}>
             <line x1="16" x2={W - 16} y1={my} y2={my} stroke="#ffffff55" stroke-dasharray="4 4" />
-            <text x={W - 6} y={my + 4} fill="#a9c9af" font-size="12" font-family="Pixelify Sans, monospace">{m * 100}%</text>
-            <circle cx={W + 30} cy={my} r="9" fill={hit ? lamp : '#26302a'} stroke="#0b100d" stroke-width="3">
+            <text x={W - 2} y={my + 4} fill="#a9c9af" font-size="12" font-family="Pixelify Sans, monospace">{m * 100}%</text>
+            <circle cx={W + 44} cy={my} r="9" fill={hit ? lamp : '#26302a'} stroke="#0b100d" stroke-width="3">
               {hit && <animate attributeName="opacity" values="1;.25;1" dur={m === 0.1 ? '.5s' : '1s'} repeatCount="indefinite" />}
             </circle>
-            {hit && <circle cx={W + 30} cy={my} r="14" fill={lamp} opacity=".35" filter="url(#ft-glow)"><animate attributeName="opacity" values=".5;0;.5" dur={m === 0.1 ? '.5s' : '1s'} repeatCount="indefinite" /></circle>}
+            {hit && <circle cx={W + 44} cy={my} r="14" fill={lamp} opacity=".35" filter="url(#ft-glow)"><animate attributeName="opacity" values=".5;0;.5" dur={m === 0.1 ? '.5s' : '1s'} repeatCount="indefinite" /></circle>}
           </g>
         );
       })}
       <rect x={W / 2 - 22} y="2" width="44" height="14" rx="4" fill="#435249" />
-      <text x={W / 2} y={H + 14} text-anchor="middle" fill={color} font-size="22" font-family="Pixelify Sans, monospace">{Math.round(level * 100)}%</text>
+      <text x={W / 2} y={H + 28} text-anchor="middle" fill={color} font-size="22" font-family="Pixelify Sans, monospace">{Math.round(level * 100)}%</text>
     </svg>
   );
 }

@@ -12,7 +12,7 @@ import { artifactSel } from './ws';
 const REACT = 'https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js';
 const REACT_DOM = 'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js';
 const BABEL = 'https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js';
-const MERMAID = 'https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js';
+const MERMAID = 'https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js';
 const BASE_CSS = 'html,body{margin:0;background:#0b130e;color:#e8ffe6;font-family:system-ui,sans-serif}';
 
 export function srcdocFor(a: Pick<Artifact, 'kind' | 'content'>): string | null {

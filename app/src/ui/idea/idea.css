@@ -50,7 +50,7 @@
 .sec .fd.full { background: var(--glob); box-shadow: 0 0 8px #8cf56b88; }
 .sec .lbl { font: 600 11px var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); display: flex; justify-content: space-between; gap: 8px; }
 .sec .val { font-size: 13.5px; white-space: pre-wrap; color: var(--text); }
-.sec .val.empty { color: var(--text-3); font-style: italic; }
+.sec .val.blank { color: var(--text-3); font-style: italic; }
 .sec textarea { width: 100%; }
 .mech-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: start; padding: 5px 0; border-bottom: 1px dashed #ffffff12; }
 .req { display: flex; gap: 8px; align-items: flex-start; padding: 5px 8px; border-radius: 10px; font-size: 13px; }

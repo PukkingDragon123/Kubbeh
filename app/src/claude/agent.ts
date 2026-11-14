@@ -20,6 +20,7 @@ export interface TurnOptions { chat: Chat; userText: string; attachments?: MsgBl
 
 export function engineAvailable(): boolean { return engineBlocker() === null && !!getEngine(); }
 
+const PATHY = new Set(['read_file', 'write_file', 'edit_file', 'delete_file', 'create_artifact', 'update_artifact']);
 const KEEP_RECENT = 4; // messages (≈2 exchanges) kept verbatim when compacting
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -253,6 +254,12 @@ function finishBlocks(msg: ChatMessage, failed = false) {
 function makeHooks(ctx: ToolCtx, msg: ChatMessage, o: { runId: string; agentId?: string; cloneOf?: string; source: UsageSource; touch: () => void; extra: ExtraTool[]; prompt: string }): EngineHooks {
   let lastWrite = 0, chars = 0, thinkingAnnounced = false;
   const toolIds = new Set<string>();
+  const pendingStart = new Map<string, string>();
+  const hasKey = (input: unknown) => !!input && typeof input === 'object' && ['path', 'title', 'query', 'url', 'id'].some((k) => typeof (input as any)[k] === 'string' && (input as any)[k]);
+  const announce = (id: string, name: string, meta: { kind: ActivityKind; label: string }) => {
+    bus.emit('tool:start', { runId: o.runId, toolId: id, tool: name, kind: meta.kind, label: meta.label, agentId: o.agentId });
+    if (o.agentId?.startsWith('clone-')) bus.emit('clone:update', { runId: o.runId, agentId: o.agentId, kind: meta.kind, label: meta.label });
+  };
   const block = (id: string) => msg.blocks.find((b) => b.type === 'tool' && b.id === id) as Extract<MsgBlock, { type: 'tool' }> | undefined;
   return {
     onThinking(delta) {
@@ -277,21 +284,35 @@ function makeHooks(ctx: ToolCtx, msg: ChatMessage, o: { runId: string; agentId?:
       thinkingAnnounced = false;
       const meta = toolMeta(name, input, o.prompt, o.extra);
       if (name !== 'ask_user' && name !== 'spawn_clones') msg.blocks.push({ type: 'tool', id, name, kind: meta.kind, label: meta.label, input: server ? input : undefined, done: false });
-      bus.emit('tool:start', { runId: o.runId, toolId: id, tool: name, kind: meta.kind, label: meta.label, agentId: o.agentId });
-      if (o.agentId?.startsWith('clone-')) bus.emit('clone:update', { runId: o.runId, agentId: o.agentId, kind: meta.kind, label: meta.label });
+      // path-based tools: wait until the path streams in so the RIGHT alien starts on the RIGHT file
+      if (!server && PATHY.has(name) && !hasKey(input)) pendingStart.set(id, name);
+      else announce(id, name, meta);
       o.touch();
     },
     onToolInput(id, input) {
       const b = block(id);
-      if (!b) return;
-      const meta = toolMeta(b.name, input, o.prompt, o.extra);
-      if (meta.label !== b.label) {
+      const name = b?.name ?? pendingStart.get(id);
+      if (!name) return;
+      const meta = toolMeta(name, input, o.prompt, o.extra);
+      if (pendingStart.has(id)) {
+        if (!hasKey(input)) return;
+        pendingStart.delete(id);
+        if (b) { b.label = meta.label; b.kind = meta.kind; }
+        announce(id, name, meta);
+        o.touch();
+        return;
+      }
+      if (b && meta.label !== b.label) {
+        const kindChanged = meta.kind !== b.kind;
         b.label = meta.label; b.kind = meta.kind;
-        bus.emit('tool:start', { runId: o.runId, toolId: id, tool: b.name, kind: meta.kind, label: meta.label, agentId: o.agentId });
+        // a different kind may mean a different alien: close the first assignment cleanly
+        if (kindChanged) bus.emit('tool:end', { runId: o.runId, toolId: id, ok: true, agentId: o.agentId });
+        announce(id, name, meta);
         o.touch();
       }
     },
     onToolEnd(id, ok, summary) {
+      if (pendingStart.has(id)) { const n = pendingStart.get(id)!; pendingStart.delete(id); announce(id, n, toolMeta(n, {}, o.prompt, o.extra)); }
       const b = block(id);
       if (b && !b.done) { b.done = true; b.isError = !ok; b.result = summary; }
       bus.emit('tool:end', { runId: o.runId, toolId: id, ok, agentId: o.agentId });
@@ -303,7 +324,15 @@ function makeHooks(ctx: ToolCtx, msg: ChatMessage, o: { runId: string; agentId?:
       msg.blocks.push({ type: 'search', query, results });
       o.touch();
     },
-    runTool: (id, name, input) => runTool(ctx, name, input),
+    runTool: (id, name, input) => {
+      if (pendingStart.has(id)) {
+        pendingStart.delete(id);
+        const meta = toolMeta(name, input, o.prompt, o.extra);
+        const b = block(id); if (b) { b.label = meta.label; b.kind = meta.kind; }
+        announce(id, name, meta);
+      }
+      return runTool(ctx, name, input);
+    },
     onUsage(model, u) {
       msg.usage = addUsage(msg.usage, u);
       record(model, u, o.source);
@@ -376,7 +405,8 @@ export async function complete(opts: { prompt: string; system?: string; model?: 
 }
 
 function localTitle(text: string): string {
-  const t = text.replace(/\s+/g, ' ').trim().replace(/^(please|hey|hi|can you|could you|i want you to|i need you to|make|build|create)\s+/i, '');
+  let t = text.replace(/\s+/g, ' ').trim(), prev = '';
+  while (t !== prev) { prev = t; t = t.replace(/^(please|pls|hey|hi|hello|ok|okay|so|basically|just|kindly|can you|could you|would you|i want you to|i need you to|i'd like you to|i would like you to|help me|let's)[\s,!.]+/i, ''); }
   const words = t.split(' ').slice(0, 7).join(' ');
   return (words.charAt(0).toUpperCase() + words.slice(1)).replace(/[.,;:!?]+$/, '') || 'New experiment';
 }

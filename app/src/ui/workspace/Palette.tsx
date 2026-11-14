@@ -16,13 +16,14 @@ export function Palette() {
   const items = useMemo<Item[]>(() => {
     const needle = q.trim().toLowerCase();
     const hit = (s: string) => !needle || s.toLowerCase().includes(needle);
-    const out: Item[] = [
+    const actionsList: Item[] = [
       { id: 'a-new', icon: 'plus', title: 'New chat', run: () => goHome(null) },
       { id: 'a-game', icon: 'arcade', title: 'New game project', run: () => void newProjectFlow('game') },
       { id: 'a-fuel', icon: 'fuel', title: 'Open fuel tank', run: () => setPanel('fuel') },
       { id: 'a-set', icon: 'gear', title: 'Settings', run: () => setPanel('settings') },
       { id: 'a-acc', icon: 'user', title: 'Accounts', run: () => setPanel('accounts') },
-    ].filter((x) => hit(x.title));
+    ];
+    const out: Item[] = actionsList.filter((x) => hit(x.title));
     for (const p of projects.value) if (hit(p.name) || hit(p.description)) out.push({ id: p.id, icon: 'folder', title: `${p.glyph} ${p.name}`, sub: 'project', run: () => goHome(p.id) });
     for (const c of chatIndex.value) if (hit(c.title)) out.push({ id: c.id, icon: c.mode === 'idea' ? 'idea' : 'chat', title: c.title, sub: 'chat', run: () => void openChat(c.id) });
     if (needle) for (const [pid, files] of Object.entries(filesByProject.value)) for (const f of files) {

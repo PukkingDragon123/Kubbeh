@@ -78,10 +78,10 @@ export function DocTab({ doc, onEdited, onAsk }: { doc: DesignDoc; onEdited: (wh
                   <div class="row" style={{ justifyContent: 'flex-end' }}><Btn size="sm" tone="ghost" onClick={() => setEditing(null)}>Cancel</Btn><Btn size="sm" tone="glob" onClick={() => commit(s)}>Save</Btn></div>
                 </div>
               ) : s.key === 'mechanics' ? (
-                doc.mechanics.length ? doc.mechanics.map((m) => <div class="mech-row" key={m.name}><span><b>{m.name}</b> <span class="dim">— {m.detail || '…'}</span></span></div>) : <span class="val empty">{s.hint}</span>
+                doc.mechanics.length ? doc.mechanics.map((m) => <div class="mech-row" key={m.name}><span><b>{m.name}</b> <span class="dim">— {m.detail || '…'}</span></span></div>) : <span class="val blank">{s.hint}</span>
               ) : s.key === 'pillars' ? (
-                (val as string[]).length ? <div class="row wrap gap-4">{(val as string[]).map((p) => <span key={p} class="chip g">{p}</span>)}</div> : <span class="val empty">{s.hint}</span>
-              ) : <span class={`val ${val ? '' : 'empty'}`}>{val || s.hint}</span>}
+                (val as string[]).length ? <div class="row wrap gap-4">{(val as string[]).map((p) => <span key={p} class="chip g">{p}</span>)}</div> : <span class="val blank">{s.hint}</span>
+              ) : <span class={`val ${val ? '' : 'blank'}`}>{val || s.hint}</span>}
             </div>
           </div>
         );

@@ -1,0 +1,14 @@
+{
+  "name": "kubbeh",
+  "description": "GLOB LABS: a voxel alien laboratory for Claude, as a Claude Code mod.",
+  "owner": {
+    "name": "PukkingDragon123"
+  },
+  "plugins": [
+    {
+      "name": "glob-labs",
+      "source": "./mod/glob-labs",
+      "description": "GLOB LABS for Claude Code: a back-alley alien lab pane, a fuel tank on your real usage limits, and an Auto-Saver that trims effort, subagents and output as fuel drops."
+    }
+  ]
+}

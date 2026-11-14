@@ -1,0 +1,18 @@
+{
+  "name": "glob-labs",
+  "version": "0.1.0",
+  "description": "Turns Claude Code into a back-alley alien lab: jelly aliens act out Claude's real tool calls, a fuel tank reads your real usage limits, and an Auto-Saver trims effort, subagents and output as fuel drops.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "PukkingDragon123"
+  },
+  "license": "MIT",
+  "keywords": [
+    "theme",
+    "pane",
+    "usage",
+    "rate-limits",
+    "game-dev",
+    "fun"
+  ]
+}

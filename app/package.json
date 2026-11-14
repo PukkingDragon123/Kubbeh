@@ -1,0 +1,32 @@
+{
+  "name": "glob-labs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "GLOB LABS — a voxel alien laboratory workspace for Claude",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:single": "tsc --noEmit && vite build --mode single",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@preact/signals": "^2.11.4",
+    "dompurify": "^3.4.18",
+    "fflate": "^0.8.3",
+    "highlight.js": "^11.12.0",
+    "marked": "^18.2.0",
+    "preact": "^11.2.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.13",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}

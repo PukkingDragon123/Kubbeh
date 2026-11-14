@@ -155,3 +155,14 @@ test('caveman notes ride beside the prompt, never in its text', async ($, on) =>
   expect(seen.text).toBe('build the level editor')
   expect((seen.context ?? []).join('\n')).toContain('caveman')
 })
+
+test('a command name someone else owns is skipped, and the rest of the lab still starts', async ($, on) => {
+  engine(on)
+  on('command.register', { name: 'glob-caveman' }, () => { throw new Error('refused: it is the user\'s /glob-caveman') })
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /Fuel 8% left/ })).toBeDefined()
+  await ui.unmount()
+  const out = await $.command.run({ command: 'glob', args: 'caveman ultra', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 120 } })
+  expect(out.text).toContain('Caveman ultra')
+})

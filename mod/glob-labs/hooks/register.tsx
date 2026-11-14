@@ -6,7 +6,7 @@
 // rations subagents (agent.spawn) and adds terse-output notes beside prompts
 // (prompt.submit context) — it never touches what a thread already sent.
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, ThemeSetArgs } from 'claude-code'
+import type { EngineInterface, On, Register, ThemeSetArgs } from 'claude-code'
 
 import type { Activity, Alien, CavemanMode, Clone, Fuel, Lab, LabSettings, PolishMode, Tier } from '../types'
 import { makeColors } from './make-colors.js'
@@ -87,7 +87,15 @@ async function readBook($: EngineInterface): Promise<GeneBook> {
 }
 
 /** Add genes and bump counters; unlocks achievements; mirrors the balance into the pane. */
-async function earn($: EngineInterface, amount: number, reason: string, counters: Record<string, number> = {}) {
+async function earn($: EngineInterface, amount: number, reason: string, counters: Record<string, number> = {}): Promise<void> {
+  try {
+    await earnNow($, amount, reason, counters)
+  } catch {
+    // Gene Points are a bonus: a store hiccup never breaks a turn.
+  }
+}
+
+async function earnNow($: EngineInterface, amount: number, reason: string, counters: Record<string, number>) {
   const book = await readBook($)
   for (const [k, v] of Object.entries(counters)) book.counters[k] = (book.counters[k] ?? 0) + v
   const add = (n: number, why: string) => {
@@ -222,7 +230,7 @@ async function measure($: EngineInterface, windows: readonly { kind: string; per
     void play($, 'alarm')
     $.ui.toast(`FUEL ${TIER_LABEL[tier].toUpperCase()}: ${Math.round(remaining ?? 0)}% left. ${s.saver ? 'Auto-Saver: ' + saverActions(tier) : 'Auto-Saver is off (/glob saver on).'}`, { timeoutMs: 9000 })
     if (s.saver) void earn($, 0, 'saver', { saverTrips: 1 })
-    $.clock.after(15500, () => { void update($, fuel, f => ({ ...f })) })
+    $.clock.after(15500, () => { update($, fuel, f => ({ ...f })).catch(() => undefined) })
   }
   await statusLine($)
 }
@@ -237,12 +245,14 @@ export const register: Register = on => {
     const book = await readBook($)
     await update($, lab, l => ({ ...l, genes: book.balance, savedTokens: book.counters.savedTokens ?? 0 }))
 
-    await $.command.register({ name: 'glob', description: 'Open the GLOB LABS pane · /glob saver on|off', argumentHint: '[saver on|off]', immediate: true })
-    await $.command.register({ name: 'fuel', description: 'GLOB LABS fuel report: real usage windows, tier, Auto-Saver actions', immediate: true })
-    await $.command.register({ name: 'caveman', description: 'Terse output to save tokens: off | lite | full | ultra | auto', argumentHint: '[off|lite|full|ultra|auto]', immediate: true })
-    await $.command.register({ name: 'polish', description: 'Trim filler from your prompts before they send: off | on | model', argumentHint: '[off|on|model]', immediate: true })
-    await $.command.register({ name: 'idea', description: 'Brainstorm a game with Prof. Glorp until it is clear, then get the build prompt', argumentHint: '<your game idea> | done' })
-    await $.command.register({ name: 'genes', description: 'GLOB LABS Gene Points, ledger and achievements', immediate: true })
+    // Every name is prefixed: a person's own skill or command may already own a short one
+    // (/caveman, /idea, ...), and the engine refuses a clash. Each is tried alone.
+    await $.command.register({ name: 'glob', description: 'GLOB LABS: open the lab · /glob fuel | saver | caveman | polish | idea | genes', argumentHint: '[fuel|saver on|off|caveman <mode>|polish <mode>|idea <idea>|genes]', immediate: true }).catch((err: unknown) => $.ui.log(`glob-labs: a command was not registered: ${String(err)}`))
+    await $.command.register({ name: 'glob-fuel', description: 'GLOB LABS fuel report: real usage windows, tier, Auto-Saver actions', immediate: true }).catch((err: unknown) => $.ui.log(`glob-labs: a command was not registered: ${String(err)}`))
+    await $.command.register({ name: 'glob-caveman', description: 'GLOB LABS terse output to save tokens: off | lite | full | ultra | auto', argumentHint: '[off|lite|full|ultra|auto]', immediate: true }).catch((err: unknown) => $.ui.log(`glob-labs: a command was not registered: ${String(err)}`))
+    await $.command.register({ name: 'glob-polish', description: 'GLOB LABS: trim filler from your prompts before they send: off | on | model', argumentHint: '[off|on|model]', immediate: true }).catch((err: unknown) => $.ui.log(`glob-labs: a command was not registered: ${String(err)}`))
+    await $.command.register({ name: 'glob-idea', description: 'Brainstorm a game with Prof. Glorp until it is clear, then get the build prompt', argumentHint: '<your game idea> | done' }).catch((err: unknown) => $.ui.log(`glob-labs: a command was not registered: ${String(err)}`))
+    await $.command.register({ name: 'glob-genes', description: 'GLOB LABS Gene Points, ledger and achievements', immediate: true }).catch((err: unknown) => $.ui.log(`glob-labs: a command was not registered: ${String(err)}`))
 
     const unpainted = problems.find(p => p.startsWith("Desktop won't paint"))
     if (unpainted) $.ui.log(`glob-labs look: ${unpainted}`)
@@ -304,7 +314,7 @@ export const register: Register = on => {
     const now = await $.clock.now()
     if (e.agentId !== undefined) {
       await update($, lab, l => ({ ...l, clones: l.clones.map(c => (c.id === e.agentId ? { ...c, activity: 'celebrating' as Activity, label: 'Delivered ✓' } : c)) }))
-      $.clock.after(2600, () => { void update($, lab, l => ({ ...l, clones: l.clones.filter(c => c.id !== e.agentId) })) })
+      $.clock.after(2600, () => { update($, lab, l => ({ ...l, clones: l.clones.filter(c => c.id !== e.agentId) })).catch(() => undefined) })
       if (e.reason === 'answer') void earn($, 3, 'A clone delivered', { clones: 1 })
       return next(e)
     }
@@ -314,7 +324,7 @@ export const register: Register = on => {
       void earn($, reward, `Experiment complete (${toolsThisTurn.count} tools)`, { turns: 1, files: toolsThisTurn.files })
       void play($, 'coin')
       $.clock.after(3500, () => {
-        void update($, lab, l => (l.crew.find(a => a.id === 'blip')?.activity === 'celebrating' ? setAlien(l, 'blip', 'idle', 'Waiting for orders', now + 3500) : l))
+        update($, lab, l => (l.crew.find(a => a.id === 'blip')?.activity === 'celebrating' ? setAlien(l, 'blip', 'idle', 'Waiting for orders', now + 3500) : l)).catch(() => undefined)
       })
     } else {
       await update($, lab, l => setAlien(restCrew(l, now), 'blip', 'idle', e.reason === 'aborted' ? 'Stopped. Waiting for orders' : 'Experiment exploded (the turn failed)', now))
@@ -387,7 +397,17 @@ export const register: Register = on => {
 
   // ── commands ──
   on('command.run', { command: 'glob' }, async ($, e) => {
-    const args = e.args.trim().toLowerCase()
+    const raw = e.args.trim()
+    const sub = raw.split(/\s+/)[0] ?? ''
+    const rest = raw.slice(sub.length).trim()
+    switch (sub.toLowerCase()) {
+      case 'fuel': return fuelCmd($)
+      case 'caveman': return cavemanCmd($, rest)
+      case 'polish': return polishCmd($, rest)
+      case 'idea': return ideaCmd($, rest)
+      case 'genes': return genesCmd($)
+    }
+    const args = raw.toLowerCase()
     if (args.startsWith('saver')) {
       const want = args.endsWith('off') ? false : args.endsWith('on') ? true : undefined
       const s = await persistSettings($, cur => ({ ...cur, saver: want ?? !cur.saver }))
@@ -398,79 +418,92 @@ export const register: Register = on => {
     return { text: opened.isPlaced ? 'GLOB LAB pane opened.' : `GLOB LAB pane is waiting for room: ${opened.reason}` }
   })
 
-  on('command.run', { command: 'fuel' }, async $ => {
-    const usage = await $.session.usage().catch(() => null)
-    if (usage) await measure($, usage.rateLimits, usage.context.percent, usage.cost?.usd)
-    const [f, s] = await Promise.all([read($, fuel), read($, settings)])
-    const now = await $.clock.now()
-    const lines = f.windows.length
-      ? f.windows.map(w => `  ${windowName(w.kind).padEnd(12)} ${String(Math.round(100 - w.percentUsed)).padStart(3)}% left  ${resetsIn(w.resetsAt, now)}`)
-      : ['  No usage windows reported yet (they appear after the first reply on a Claude subscription; API-key sessions have none).']
-    return {
-      text: [
-        `GLOB LABS fuel: ${f.remaining === null ? 'no reading' : `${Math.round(f.remaining)}% left in the emptiest window`} · ${TIER_LABEL[f.tier]}`,
-        ...lines,
-        `  Context ${f.contextPercent ?? '--'}% · session cost ${f.costUsd !== undefined ? '$' + f.costUsd.toFixed(2) : '--'}`,
-        `Auto-Saver ${s.saver ? 'on' : 'off'}: ${saverActions(f.tier)}`,
-        `Caveman: ${s.caveman} (in force: ${cavemanLevel(s.caveman, f.tier, s.saver)}) · Polish: ${s.polish}`,
-      ].join('\n'),
-    }
-  })
+  on('command.run', { command: 'glob-fuel' }, $ => fuelCmd($))
+  on('command.run', { command: 'glob-caveman' }, ($, e) => cavemanCmd($, e.args))
+  on('command.run', { command: 'glob-polish' }, ($, e) => polishCmd($, e.args))
+  on('command.run', { command: 'glob-idea' }, ($, e) => ideaCmd($, e.args))
+  on('command.run', { command: 'glob-genes' }, $ => genesCmd($))
 
-  on('command.run', { command: 'caveman' }, async ($, e) => {
-    const arg = e.args.trim().toLowerCase() as CavemanMode
-    const modes: CavemanMode[] = ['off', 'lite', 'full', 'ultra', 'auto']
-    if (!modes.includes(arg)) {
-      const s = await read($, settings)
-      return { text: `Caveman is ${s.caveman}. Use /caveman off | lite | full | ultra | auto (auto follows the fuel tank).` }
-    }
-    await persistSettings($, s => ({ ...s, caveman: arg }))
-    if (arg !== 'off') void earn($, 0, 'caveman', { caveman: 1 })
-    return { text: arg === 'off' ? 'Caveman off. Normal answers.' : arg === 'auto' ? 'Caveman auto: lite below 25% fuel, full below 10%.' : `Caveman ${arg}: me write short. Code stay exact.` }
-  })
+  drawing(on)
+}
 
-  on('command.run', { command: 'polish' }, async ($, e) => {
-    const arg = e.args.trim().toLowerCase() as PolishMode
-    if (!(['off', 'on', 'model'] as PolishMode[]).includes(arg)) {
-      const s = await read($, settings)
-      return { text: `Polish is ${s.polish}. /polish on trims filler locally (free); /polish model also asks Haiku to tighten long prompts and keeps the result only if every key term survived; /polish off.` }
-    }
-    await persistSettings($, s => ({ ...s, polish: arg }))
-    return { text: `Prompt polish ${arg}.` }
-  })
+// ── command bodies ───────────────────────────────────────────────────────────
+type CmdResult = { text: string; context?: string[] }
 
-  on('command.run', { command: 'idea' }, async ($, e) => {
-    const idea = e.args.trim()
-    const now = await $.clock.now()
-    if (/^(done|off|stop|exit)$/i.test(idea)) {
-      await update($, lab, l => setAlien({ ...l, idea: null }, 'glorp', 'celebrating', 'Idea locked in!', now))
-      void play($, 'fanfare')
-      return { text: 'Prof. Glorp idea mode off. Go build it!' }
-    }
-    if (!idea) return { text: 'Usage: /idea <your game idea>  ·  /idea done to finish.' }
-    await update($, lab, l => setAlien({ ...l, idea }, 'glorp', 'ideas', `Brainstorming: ${short(idea, 40)}`, now))
-    void earn($, 5, 'Started an idea session', { ideas: 1 })
-    void play($, 'boing')
-    await $.prompt.submit({ text: `Prof. Glorp, let's develop my game idea: ${idea}` })
-    return { text: `Prof. Glorp grabbed the chalk. Brainstorming: ${idea}`, context: [glorp(idea)] }
-  })
+async function fuelCmd($: EngineInterface): Promise<CmdResult> {
+  const usage = await $.session.usage().catch(() => null)
+  if (usage) await measure($, usage.rateLimits, usage.context.percent, usage.cost?.usd)
+  const [f, s] = await Promise.all([read($, fuel), read($, settings)])
+  const now = await $.clock.now()
+  const lines = f.windows.length
+    ? f.windows.map(w => `  ${windowName(w.kind).padEnd(12)} ${String(Math.round(100 - w.percentUsed)).padStart(3)}% left  ${resetsIn(w.resetsAt, now)}`)
+    : ['  No usage windows reported yet (they appear after the first reply on a Claude subscription; API-key sessions have none).']
+  return {
+    text: [
+      `GLOB LABS fuel: ${f.remaining === null ? 'no reading' : `${Math.round(f.remaining)}% left in the emptiest window`} · ${TIER_LABEL[f.tier]}`,
+      ...lines,
+      `  Context ${f.contextPercent ?? '--'}% · session cost ${f.costUsd !== undefined ? '$' + f.costUsd.toFixed(2) : '--'}`,
+      `Auto-Saver ${s.saver ? 'on' : 'off'}: ${saverActions(f.tier)}`,
+      `Caveman: ${s.caveman} (in force: ${cavemanLevel(s.caveman, f.tier, s.saver)}) · Polish: ${s.polish}`,
+    ].join('\n'),
+  }
+}
 
-  on('command.run', { command: 'genes' }, async $ => {
-    const book = await readBook($)
-    const got = ACHIEVEMENTS.filter(a => book.achievements[a.id]).map(a => a.name)
-    const todo = ACHIEVEMENTS.filter(a => !book.achievements[a.id]).map(a => `${a.name} (+${a.reward})`)
-    return {
-      text: [
-        `Gene Points: ${book.balance} (lifetime ${book.lifetime})`,
-        ...book.ledger.slice(0, 8).map(r => `  +${r.amount}  ${r.reason}`),
-        `Achievements: ${got.length ? got.join(', ') : 'none yet'}`,
-        `Still to unlock: ${todo.join(', ') || 'all done!'}`,
-        'Spend them in the GLOB LABS web app (furniture, hats, the idea slot machine).',
-      ].join('\n'),
-    }
-  })
+async function cavemanCmd($: EngineInterface, args: string): Promise<CmdResult> {
+  const arg = args.trim().toLowerCase() as CavemanMode
+  const modes: CavemanMode[] = ['off', 'lite', 'full', 'ultra', 'auto']
+  if (!modes.includes(arg)) {
+    const s = await read($, settings)
+    return { text: `Caveman is ${s.caveman}. Use /glob-caveman off | lite | full | ultra | auto (auto follows the fuel tank).` }
+  }
+  await persistSettings($, s => ({ ...s, caveman: arg }))
+  if (arg !== 'off') await earn($, 0, 'caveman', { caveman: 1 })
+  return { text: arg === 'off' ? 'Caveman off. Normal answers.' : arg === 'auto' ? 'Caveman auto: lite below 25% fuel, full below 10%.' : `Caveman ${arg}: me write short. Code stay exact.` }
+}
 
-  // ── drawing ──
+async function polishCmd($: EngineInterface, args: string): Promise<CmdResult> {
+  const arg = args.trim().toLowerCase() as PolishMode
+  if (!(['off', 'on', 'model'] as PolishMode[]).includes(arg)) {
+    const s = await read($, settings)
+    return { text: `Polish is ${s.polish}. /glob-polish on trims filler locally (free); /glob-polish model also asks Haiku to tighten long prompts and keeps the result only if every key term survived; /glob-polish off.` }
+  }
+  await persistSettings($, s => ({ ...s, polish: arg }))
+  return { text: `Prompt polish ${arg}.` }
+}
+
+async function ideaCmd($: EngineInterface, args: string): Promise<CmdResult> {
+  const idea = args.trim()
+  const now = await $.clock.now()
+  if (/^(done|off|stop|exit)$/i.test(idea)) {
+    await update($, lab, l => setAlien({ ...l, idea: null }, 'glorp', 'celebrating', 'Idea locked in!', now))
+    void play($, 'fanfare')
+    return { text: 'Prof. Glorp idea mode off. Go build it!' }
+  }
+  if (!idea) return { text: 'Usage: /glob-idea <your game idea>  ·  /glob-idea done to finish.' }
+  await update($, lab, l => setAlien({ ...l, idea }, 'glorp', 'ideas', `Brainstorming: ${short(idea, 40)}`, now))
+  void earn($, 5, 'Started an idea session', { ideas: 1 })
+  void play($, 'boing')
+  await $.prompt.submit({ text: `Prof. Glorp, let's develop my game idea: ${idea}` })
+  return { text: `Prof. Glorp grabbed the chalk. Brainstorming: ${idea}`, context: [glorp(idea)] }
+}
+
+async function genesCmd($: EngineInterface): Promise<CmdResult> {
+  const book = await readBook($)
+  const got = ACHIEVEMENTS.filter(a => book.achievements[a.id]).map(a => a.name)
+  const todo = ACHIEVEMENTS.filter(a => !book.achievements[a.id]).map(a => `${a.name} (+${a.reward})`)
+  return {
+    text: [
+      `Gene Points: ${book.balance} (lifetime ${book.lifetime})`,
+      ...book.ledger.slice(0, 8).map(r => `  +${r.amount}  ${r.reason}`),
+      `Achievements: ${got.length ? got.join(', ') : 'none yet'}`,
+      `Still to unlock: ${todo.join(', ') || 'all done!'}`,
+      'Spend them in the GLOB LABS web app (furniture, hats, the idea slot machine).',
+    ].join('\n'),
+  }
+}
+
+// ── drawing ──────────────────────────────────────────────────────────────────
+function drawing(on: On) {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const [l, f, s] = await Promise.all([read($, lab), read($, fuel), read($, settings)])
     const now = await $.clock.now()

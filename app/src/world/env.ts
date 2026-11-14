@@ -27,27 +27,31 @@ function buildFloor(): THREE.Group {
   const tileTone: number[][] = [];
   for (let tx = 0; tx < 24; tx++) { tileTone[tx] = []; for (let tz = 0; tz < 16; tz++) tileTone[tx][tz] = R(); }
   for (let x = -48; x < 48; x++) for (let z = -32; z < 32; z++) {
-    const tx = Math.floor((x + 48) / 4), tz = Math.floor((z + 32) / 4);
-    const grout = (x + 48) % 4 === 0 || (z + 32) % 4 === 0;
-    const t = tileTone[tx][tz];
-    let c = new THREE.Color().setHSL(0.36, 0.06 + t * 0.03, 0.15 + t * 0.05);
-    if (grout) c.multiplyScalar(0.55);
+    const tx = Math.floor((x + 48) / 8), tz = Math.floor((z + 32) / 8);
+    const grout = (x + 48) % 8 === 0 || (z + 32) % 8 === 0;
+    const t = tileTone[tx % 24][tz % 16];
+    const n = R();
+    const c = new THREE.Color().setHSL(0.38 + t * 0.04, 0.07 + t * 0.04, 0.085 + t * 0.035 + n * 0.012);
+    if (grout) c.multiplyScalar(0.45);
+    // hairline cracks
+    if (Math.abs(Math.sin(x * 0.31 + t * 9) * 3 + z * 0.08 - Math.cos(z * 0.23) * 2) < 0.07 && t > 0.6) c.multiplyScalar(0.5);
     // slime stains near the vat (back-left) and oil near the workbench
     const dv = Math.hypot(x * S + 9, z * S + 6);
-    if (dv < 2.6 && R() < 0.9 - dv * 0.3) c.lerp(new THREE.Color('#3f8f2a'), 0.35);
+    if (dv < 2.8 && R() < 0.95 - dv * 0.3) c.lerp(new THREE.Color('#2f7a24'), 0.4);
     const dw = Math.hypot(x * S - 6, z * S - 1.5);
-    if (dw < 1.6 && R() < 0.5) c.multiplyScalar(0.7);
-    if (R() < 0.012) c.multiplyScalar(0.65); // grime speckle
+    if (dw < 1.4 && R() < 0.6) c.multiplyScalar(0.6);
+    if (n < 0.02) c.multiplyScalar(0.6); // grime speckle
+    if (n > 0.9985) c.lerp(new THREE.Color('#ffbe3d'), 0.12); // flecks of old paint
     v.set(x, -1, z, c.getHex());
   }
   const built = buildVox(v, { size: S, center: 'none', origin: [0, 0, 0], noAO: true, jitter: 0.04 });
-  const floor = new THREE.Mesh(built.solid!, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.08 }));
+  const floor = new THREE.Mesh(built.solid!, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.18, envMapIntensity: 0.8 }));
   floor.receiveShadow = true;
   floor.name = 'floor';
   g.add(floor);
 
   // puddles: glossy dark pools that catch the neon
-  const puddleMat = new THREE.MeshStandardMaterial({ color: 0x0b1410, roughness: 0.04, metalness: 0.6, transparent: true, opacity: 0.88, envMapIntensity: 1.4 });
+  const puddleMat = new THREE.MeshStandardMaterial({ color: 0x1c2a26, roughness: 0.06, metalness: 0.35, transparent: true, opacity: 0.55, envMapIntensity: 1.6, depthWrite: false });
   const spots: [number, number, number, number][] = [[-4.2, 4.4, 1.6, 0.9], [3.5, 5.6, 1.2, 0.7], [7.5, -2.6, 1.0, 0.6], [-1.2, -3.5, 0.9, 0.5], [0.8, 2.2, 0.7, 0.45], [-8.2, 1.5, 1.1, 0.7], [9.5, 6.5, 1.3, 0.8]];
   for (const [x, z, rx, rz] of spots) {
     const shape = new THREE.Shape();
@@ -59,7 +63,7 @@ function buildFloor(): THREE.Group {
       if (i === 0) shape.moveTo(px, pz); else shape.lineTo(px, pz);
     }
     const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), puddleMat);
-    m.rotation.x = Math.PI / 2; m.position.set(x, 0.012, z); m.scale.y = -1; m.receiveShadow = true;
+    m.rotation.x = -Math.PI / 2; m.position.set(x, 0.012, z); m.receiveShadow = true;
     g.add(m);
   }
 
@@ -168,8 +172,8 @@ function buildPipes(drips: THREE.Vector3[], vents: THREE.Vector3[]) {
   drop(166, 9, 32, 4, GRN);
   drop(150, 0, 37, 1, COP);
   // elbow + valve wheels (glowing red handles)
-  v.box(148, 18, 0, 155, 19, 7, 0x9b2a2a, 1.4).box(151, 15, 0, 152, 22, 7, 0x9b2a2a, 1.4);
-  v.box(70, 30, 3, 73, 35, 9, 0x9b2a2a, 1.4);
+  v.box(148, 18, 0, 155, 19, 7, 0x9b2a2a, 0.9).box(151, 15, 0, 152, 22, 7, 0x9b2a2a, 0.9);
+  v.box(70, 30, 3, 73, 35, 9, 0x9b2a2a, 0.9);
   // pressure gauges
   v.box(90, 34, 4, 95, 39, 6, 0xd9d4c0).box(92, 36, 6, 93, 38, 7, 0x222222);
   const m = voxMesh(v, { size: S, center: 'none', origin: [0, 0, 0], material: MAT.metal });
@@ -199,7 +203,7 @@ function buildLamp() {
   const SH = 0x2a4a3a;
   for (let y = 0; y < 4; y++) { const r = 2 + (3 - y) * 1.2; v.cyl(0, 0, r, y, y + 1, y === 3 ? 0x3d6b52 : SH, 0, y === 3 ? 0 : 1.2); }
   v.box(-1, 4, -1, 2, 5, 2, 0x1b221e);
-  v.ellipsoid(0, 0.8, 0, 1.6, 1.2, 1.6, 0xffd38a, 3.2);
+  v.ellipsoid(0, 0.8, 0, 1.6, 1.2, 1.6, 0xffd38a, 2.2);
   const g = voxMesh(v, { size: 0.1, center: 'none', origin: [0, 0, 0] });
   const cable = new THREE.Mesh(new THREE.BoxGeometry(0.03, 6, 0.03), new THREE.MeshBasicMaterial({ color: 0x050505 }));
   cable.position.y = 3.4;
@@ -298,6 +302,48 @@ function buildSky() {
   return g;
 }
 
+
+// ── the building across the back alley (seen through the window & over the wall) ──
+function backFacade() {
+  const g = new THREE.Group();
+  const rr = rng(4242);
+  const W = 512, H = 256;
+  const base = pixTex(W, H, (ctx) => {
+    ctx.fillStyle = '#221a1e'; ctx.fillRect(0, 0, W, H);
+    for (let y = 0; y < H; y += 3) for (let x = (y / 3) % 2 ? 0 : 3; x < W; x += 6) { ctx.fillStyle = rr() < 0.5 ? '#36272b' : '#2c2126'; ctx.fillRect(x, y, 5, 2); }
+    // fire escapes
+    ctx.fillStyle = '#0d0f10';
+    for (const fx0 of [300, 120]) for (const fy of [70, 130, 190]) { ctx.fillRect(fx0, fy, 90, 2); for (let x = fx0; x < fx0 + 90; x += 4) ctx.fillRect(x, fy - 10, 1, 10); ctx.fillRect(fx0, fy - 10, 90, 1); for (let i = 0; i < 40; i++) ctx.fillRect(fx0 + 20 + i, fy + 2 + i * 1.4, 2, 1); }
+    // pipes & AC units
+    ctx.fillStyle = '#3a4440'; for (const [x, y] of [[60, 150], [430, 90], [470, 200]]) { ctx.fillRect(x, y, 22, 14); ctx.fillStyle = '#2a302e'; ctx.fillRect(x + 3, y + 3, 16, 8); ctx.fillStyle = '#3a4440'; }
+  });
+  const glow = pixTex(W, H, (ctx) => {
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    for (let wy = 8; wy < H - 30; wy += 15) for (let wx = 10; wx < W - 10; wx += 14) {
+      const lit = rr();
+      if (lit < 0.62) continue;
+      const col = lit < 0.68 ? '#ff6fd6' : lit < 0.73 ? '#52f2ff' : lit < 0.77 ? '#8cf56b' : '#ffcf7a';
+      ctx.fillStyle = col; ctx.globalAlpha = 0.35 + rr() * 0.5; ctx.fillRect(wx, wy, 7, 9);
+      ctx.globalAlpha = 1; ctx.fillStyle = '#000'; ctx.fillRect(wx + 3, wy, 1, 9);
+      if (rr() < 0.3) { ctx.fillRect(wx + Math.floor(rr() * 4), wy + 4, 2, 5); }
+    }
+    pixText(ctx, 'HOTEL', 440, 40, 1, '#52f2ff');
+    // noodle shop at street level, framed by the lab's smashed window
+    ctx.fillStyle = '#ff6fd6'; ctx.globalAlpha = 0.18; ctx.fillRect(176, 226, 76, 26); ctx.globalAlpha = 1;
+    pixText(ctx, 'NOODLES', 186, 230, 1, '#ff6fd6'); pixText(ctx, 'OPEN 24H', 186, 241, 1, '#ffcf7a');
+  });
+  const mat = new THREE.MeshStandardMaterial({ map: base, emissiveMap: glow, emissive: new THREE.Color(1.4, 1.4, 1.4), roughness: 0.9 });
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(64, 32), mat);
+  wall.position.set(0, 16 - 0.3, -13);
+  g.add(wall);
+  // back alley ground + a lone streetlamp glow
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(64, 8), new THREE.MeshStandardMaterial({ color: 0x0a0d0c, roughness: 0.5, metalness: 0.3 }));
+  ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.26, -10.5);
+  g.add(ground);
+  const sl = new THREE.PointLight(0xffb060, 22, 14, 1.5); sl.position.set(-5, 4, -11); g.add(sl);
+  return g;
+}
+
 // ── alley clutter ────────────────────────────────────────────────────────────
 function dumpster() {
   const v = new Vox();
@@ -308,7 +354,7 @@ function dumpster() {
   // trash bags peeking out
   v.ellipsoid(5, 12.5, 5, 3, 2, 3, 0x15171a).ellipsoid(11, 12.8, 4, 3, 2.4, 3, 0x1a1c20);
   // glowing goo leak
-  v.box(8, 1, 10, 11, 2, 12, 0x8cf56b, 2.2);
+  v.box(8, 1, 10, 11, 2, 12, 0x8cf56b, 1.3);
   return voxMesh(v, { size: 0.125 });
 }
 function crate(c = 0x6b4a2e) {
@@ -320,7 +366,7 @@ function crate(c = 0x6b4a2e) {
 function barrel() {
   const v = new Vox();
   v.cyl(3.5, 3.5, 3.5, 0, 9, (x, y) => (y === 2 || y === 7 ? 0x5a5f58 : 0x8a7a1e));
-  v.cyl(3.5, 3.5, 2.6, 9, 10, 0x9dff6b, 2.4);
+  v.cyl(3.5, 3.5, 2.6, 9, 10, 0x9dff6b, 1.3);
   v.box(2, 4, -0.5, 6, 6, 0.5, 0x111111);
   return voxMesh(v, { size: 0.125 });
 }
@@ -360,24 +406,24 @@ function graffiti() {
 export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' | 'high'): EnvHandles {
   const group = new THREE.Group(); group.name = 'env';
   const drips: THREE.Vector3[] = [], steamVents: THREE.Vector3[] = [];
-  group.add(buildFloor(), buildWalls(), buildPipes(drips, steamVents), buildSky());
+  group.add(buildFloor(), buildWalls(), buildPipes(drips, steamVents), buildSky(), backFacade());
 
   // neon sign: GLOB LABS on the back wall above the computer bank
-  const sign = neonText('GLOB LABS', [0x8cf56b, 0x8cf56b, 0x8cf56b, 0x8cf56b, 0, 0xff6fd6, 0xff6fd6, 0xff6fd6, 0xff6fd6], 0.13, 3.4);
+  const sign = neonText('GLOB LABS', [0x8cf56b, 0x8cf56b, 0x8cf56b, 0x8cf56b, 0, 0xff6fd6, 0xff6fd6, 0xff6fd6, 0xff6fd6], 0.12, 2.1);
   const board = neonBackboard(sign.width + 0.3, 1.2);
   const signGroup = new THREE.Group();
   board.position.set(-0.4, -0.35, -0.12);
   signGroup.add(board, sign.group);
-  signGroup.position.set(1.3 - sign.width / 2, 3.95, ROOM.z0 + 0.4);
+  signGroup.position.set(1.3 - sign.width / 2, 2.95, ROOM.z0 + 0.4);
   group.add(signGroup);
   // OPEN 24/7 on the left wall
-  const open = neonText('OPEN 24/7', [0x52f2ff], 0.07, 3);
+  const open = neonText('OPEN 24/7', [0x52f2ff], 0.07, 2);
   open.group.rotation.y = Math.PI / 2;
   open.group.position.set(ROOM.x0 + 0.32, 3.1, -0.5 + open.width / 2);
   const ob = neonBackboard(open.width + 0.2, 0.6); ob.rotation.y = Math.PI / 2; ob.position.set(ROOM.x0 + 0.22, 2.85, -0.4 + open.width / 2 + 0.25);
   group.add(open.group, ob);
   // arrow sign "← LAB" over the alley
-  const lab = neonText('LAB', [0xffbe3d], 0.09, 2.6);
+  const lab = neonText('LAB', [0xffbe3d], 0.09, 1.8);
   lab.group.position.set(-11, 2.6, 7.2); lab.group.rotation.y = 0.5;
   group.add(lab.group);
 
@@ -395,27 +441,27 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
 
   // hanging lamps (warm pools of light)
   const lamps: THREE.SpotLight[] = [];
-  const lampSpots: [number, number, number][] = [[1.2, 4.6, -4.8], [-6.2, 4.4, 1.8], [6, 4.4, 1.2]];
+  const lampSpots: [number, number, number][] = [[1.2, 5.0, -4.6], [-6.4, 4.2, 2.2], [6, 4.6, 1.0]];
   lampSpots.forEach(([x, y, z], i) => {
     const l = buildLamp(); l.position.set(x, y, z); group.add(l);
-    const s = new THREE.SpotLight(0xffc77a, 46, 13, 0.72, 0.65, 1.6);
+    const s = new THREE.SpotLight(0xffc27a, 34, 14, 0.78, 0.7, 1.5);
     s.position.set(x, y + 0.1, z); s.target.position.set(x, 0, z + 0.4);
     if (quality === 'high' && i === 0) { s.castShadow = true; s.shadow.mapSize.set(1024, 1024); s.shadow.bias = -0.0008; s.shadow.radius = 3; }
     group.add(s, s.target); lamps.push(s);
   });
 
   // lights
-  const hemi = new THREE.HemisphereLight(0x3a4a78, 0x0c1410, 1.1);
-  const moonLight = new THREE.DirectionalLight(0x8aa0ff, 0.55); moonLight.position.set(-20, 30, -30);
+  const hemi = new THREE.HemisphereLight(0x3a4a8a, 0x0c1410, 0.55);
+  const moonLight = new THREE.DirectionalLight(0x8aa0ff, 0.45); moonLight.position.set(-20, 30, -30);
   group.add(hemi, moonLight);
   const neonLights: THREE.PointLight[] = [];
   const pl = (c: number, i: number, d: number, x: number, y: number, z: number) => { const p = new THREE.PointLight(c, i, d, 1.6); p.position.set(x, y, z); group.add(p); neonLights.push(p); return p; };
-  pl(0x8cf56b, 16, 11, -1.4, 4.3, ROOM.z0 + 1.4);
-  pl(0xff6fd6, 16, 11, 3.6, 4.3, ROOM.z0 + 1.4);
-  pl(0x52f2ff, 6, 7, ROOM.x0 + 1.2, 3, -0.5);
-  pl(0xffbe3d, 5, 6, -10.5, 2.5, 7);
+  pl(0x8cf56b, 14, 12, -1.4, 3.4, ROOM.z0 + 1.6);
+  pl(0xff6fd6, 14, 12, 3.8, 3.4, ROOM.z0 + 1.6);
   // fill from the alley front so silhouettes read
-  const fill = new THREE.PointLight(0x6a7cff, 10, 22, 1.4); fill.position.set(0, 6, 12); group.add(fill);
+  const fill = new THREE.PointLight(0x6a7cff, 7, 24, 1.3); fill.position.set(0, 7, 12); group.add(fill);
+  const pinkFill = new THREE.PointLight(0xff4fc0, 5, 16, 1.4); pinkFill.position.set(9, 3, 5); group.add(pinkFill);
+
 
   scene.add(group);
 
@@ -432,8 +478,8 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
         let n = 0;
         const iv = setInterval(() => { m.opacity = n % 2 ? 1 : 0.18; if (++n > 5) { clearInterval(iv); m.opacity = 1; } }, 55);
       }
-      neonLights[0].intensity = 16 + Math.sin(t * 13) * 0.6;
-      neonLights[1].intensity = 16 + Math.sin(t * 11 + 1) * 0.6;
+      neonLights[0].intensity = 14 + Math.sin(t * 13) * 0.6;
+      neonLights[1].intensity = 14 + Math.sin(t * 11 + 1) * 0.6;
     },
   };
 }

@@ -11,6 +11,7 @@ import { Icon } from '../common/icons';
 import { MODELS, EFFORT_ORDER, EFFORT_LABEL, modelInfo } from '../../claude/models';
 import { fullPolicy, TIER_LABEL } from '../../claude/fuel';
 import { localCompress, polishPrompt } from '../../claude/polish';
+import { recordPolishSavings } from '../../economy/achievements';
 import { contextEstimate, engineAvailable } from '../../claude/agent';
 import { chatSig, composerSeed, isRunning, send, stop, tick } from './ws';
 
@@ -95,6 +96,8 @@ export function Composer({ placeholder, autofocus, compact }: { placeholder?: st
       if (p && p.after < p.before) { final = p.text; from = body; }
       setPolish(null);
     }
+    if (!from && undo) from = undo;
+    if (from && from !== final) recordPolishSavings(Math.max(0, estimateTokens(from) - estimateTokens(final)));
     setText(''); setAtts([]); setPolish(null); setUndo(null);
     void send(final, atts, from);
   }

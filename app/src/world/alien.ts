@@ -37,7 +37,7 @@ interface Palette { body: number; belly: number; spot: number; shine: number; gh
 function palette(look: AlienLook): Palette {
   const c = (h: string) => new THREE.Color(h).getHex();
   switch (look.skin) {
-    case 'pounce': return { body: 0xe9edf0, belly: 0xffffff, spot: 0x2a2a30, shine: 0xffffff, cat: true };
+    case 'pounce': return { body: 0xe4e8ec, belly: 0xffffff, spot: 0x34343e, shine: 0xffffff, cat: true };
     case 'pickle': return { body: 0x5f9a2e, belly: 0x9cc95a, spot: 0x86c24a, shine: 0xd8ffb0, bumps: true };
     case 'bubblegum': return { body: 0xff8fd0, belly: 0xffd0ec, spot: 0xffb8e4, shine: 0xffffff };
     case 'ghost': return { body: 0x7ff0ff, belly: 0xc8fbff, spot: 0xb0f8ff, shine: 0xffffff, ghost: true };
@@ -61,6 +61,16 @@ function cachedVox(key: string, make: () => Vox, origin?: [number, number, numbe
   return { solid: g, glow: glowCache.get(key) ?? null };
 }
 
+const ROSETTES: [number, number, number][] = [[-5, 7, 2], [4, 8, -1], [-2, 9, -3], [5, 4, 3], [-6, 3, -2], [1, 9, 4], [-3, 5, -5], [3, 2, -5], [6, 6, -4], [-5, 8, -4], [0, 6, -5], [-6, 6, 4]];
+function rosette(x: number, y: number, z: number): 0 | 1 | 2 {
+  for (const [cx, cy, cz] of ROSETTES) {
+    const d = Math.hypot(x - cx, y - cy, z - cz);
+    if (d < 1.1) return 1;
+    if (d < 2.05) { const a = Math.atan2(y - cy, x - cx + z - cz); return Math.sin(a * 2.5 + cx) > -0.55 ? 2 : 1; }
+  }
+  return 0;
+}
+
 function headVox(p: Palette, seed: number) {
   const v = new Vox();
   const W = 12, H = 10, D = 10;
@@ -70,11 +80,12 @@ function headVox(p: Palette, seed: number) {
     const h = Math.sin(vx.x * 12.9898 + vx.y * 78.233 + vx.z * 37.719 + seed) * 43758.5453;
     const r = h - Math.floor(h);
     if (p.cat) {
-      // snow leopard rosettes
-      const ring = Math.sin(vx.x * 1.7 + vx.z * 0.9) * Math.cos(vx.y * 1.9 + vx.x * 0.4);
-      if (ring > 0.72 && vx.y > 3) return p.spot;
-      if (vx.y < 3) return 0xffffff;
-      return r < 0.15 ? 0xdfe4e8 : undefined;
+      // snow leopard rosettes: dark open rings with a warm grey centre
+      if (vx.y < 3 && vx.z > 0) return 0xffffff;
+      const ros = rosette(vx.x, vx.y, vx.z);
+      if (ros === 2) return p.spot;
+      if (ros === 1) return 0xc9c2b4;
+      return r < 0.18 ? 0xd9dee2 : undefined;
     }
     if (vx.y >= 7 && vx.x <= -2 && vx.x >= -4 && vx.z >= 1) return p.shine;
     if (r < 0.07 && vx.y > 2) return p.spot;
@@ -95,7 +106,7 @@ function bodyVox(p: Palette) {
   const v = new Vox();
   v.rbox(-4, 0, -3, 4, 6, 3, 2.2, p.body);
   v.paint((vx) => (vx.z >= 2 && Math.abs(vx.x) <= 2 && vx.y >= 1 && vx.y <= 4 ? p.belly : undefined));
-  if (p.cat) v.paint((vx) => (Math.sin(vx.x * 2.1 + vx.y * 1.3) * Math.cos(vx.z * 1.7) > 0.75 && vx.z < 2 ? p.spot : undefined));
+  if (p.cat) v.paint((vx) => { if (vx.z >= 2 && Math.abs(vx.x) <= 2) return undefined; const r2 = rosette(vx.x * 1.4, vx.y + 2, vx.z * 1.6); return r2 === 2 ? p.spot : r2 === 1 ? 0xc9c2b4 : undefined; });
   if (p.stars) for (const vx of v.map.values()) if (Math.abs(Math.sin(vx.x * 71.3 + vx.y * 17.1 + vx.z * 33.7)) > 0.975) { vx.m = 2.5; vx.c = 0xffffff; }
   if (p.cracks) for (const vx of v.map.values()) if ((vx.x * 3 + vx.y * 5 + vx.z * 7) % 9 === 0) { vx.c = p.cracks; vx.m = 2.2; }
   return v;
@@ -107,7 +118,7 @@ function armVox(p: Palette, paw = false) {
   else v.rbox(-1, -4, -1, 1, 0, 1, 0.6, p.body);
   return v;
 }
-function bulbVox(color: number) { const v = new Vox(); v.ellipsoid(0, 0, 0, 1.6, 1.6, 1.6, color, 2.6); v.set(-1, 1, 0, 0xffffff, 3); return v; }
+function bulbVox(color: number) { const v = new Vox(); v.ellipsoid(0, 0, 0, 1.6, 1.6, 1.6, color, 1.7); v.set(-1, 1, 1, 0xffffff, 1.8); return v; }
 function stalkVox(color: number) { const v = new Vox(); v.box(0, 0, 0, 1, 5, 1, color); return v; }
 function tailVox(p: Palette) {
   const v = new Vox();
@@ -130,7 +141,7 @@ const COS: Record<string, Cos> = {
   halo: { at: 'head', pos: [0, 0.82, 0], float: true, make: () => { const v = new Vox(); v.cyl(0, 0, 5, 0, 1, 0xffe27a, 2.6, 1.2); return v; } },
   crown: { at: 'head', pos: [0, 0.58, 0], make: () => { const v = new Vox(); v.cyl(0, 0, 4.5, 0, 2, 0xe8b73a, 0, 1.2); for (let a = 0; a < 5; a++) { const ang = (a / 5) * Math.PI * 2; v.box(Math.round(Math.cos(ang) * 4), 2, Math.round(Math.sin(ang) * 4), Math.round(Math.cos(ang) * 4) + 1, 4, Math.round(Math.sin(ang) * 4) + 1, 0xe8b73a); } v.set(0, 1, 4, 0xff3a6a, 2.4).set(-4, 1, 0, 0x52f2ff, 2.4).set(4, 1, 0, 0x8cf56b, 2.4); return v; } },
   // outfits
-  labcoat: { at: 'body', pos: [0, -0.02, 0], size: AS, make: () => { const v = new Vox(); v.rbox(-5, -1, -4, 5, 6, 4, 2, 0xf2f4ee); v.carve((x, y, z) => z >= 2 && Math.abs(x) <= 1 && y >= 0); v.box(2, 2, 3, 4, 3, 4, 0x52a0ff); v.set(3, 3, 4, 0xff6fd6); v.paint((vx) => (vx.y === -1 ? 0xdfe3da : undefined)); return v; } },
+  labcoat: { at: 'body', pos: [0, -0.02, 0], size: AS, make: () => { const v = new Vox(); v.rbox(-5, -1, -4, 5, 6, 4, 2, 0xf2f4ee); v.carve((x, y, z) => z >= 1 && Math.abs(x + 0.5) <= 2.5 && y >= -1); v.box(-4, 4, 2, -2, 6, 4, 0xdfe3da).box(2, 4, 2, 4, 6, 4, 0xdfe3da); v.box(2, 1, 3, 4, 3, 4, 0xe4e8e0).set(3, 3, 4, 0x52a0ff).set(2, 3, 4, 0xff6fd6); v.box(-4, 1, 3, -2, 2, 4, 0xe4e8e0); v.paint((vx) => (vx.y === -1 ? 0xd4d8ce : undefined)); return v; } },
   hoodie: { at: 'body', pos: [0, -0.02, 0], size: AS, make: () => { const v = new Vox(); v.rbox(-5, -1, -4, 5, 6, 4, 2, 0x5a5f6b); v.box(-2, 1, 3, 3, 3, 5, 0x4a4f5a); v.rbox(-4, 4, -6, 4, 8, -2, 1.5, 0x5a5f6b); v.set(-1, 5, 4, 0xeeeeee).set(1, 5, 4, 0xeeeeee).set(-1, 4, 4, 0xeeeeee).set(1, 4, 4, 0xeeeeee); return v; } },
   overalls: { at: 'body', pos: [0, -0.02, 0], size: AS, make: () => { const v = new Vox(); v.rbox(-5, -1, -4, 5, 3, 4, 1.5, 0x2f5a9a); v.box(-2, 3, 3, 3, 5, 4, 0x2f5a9a); v.box(-3, 3, 3, -2, 6, 4, 0x2f5a9a).box(3, 3, 3, 4, 6, 4, 0x2f5a9a); v.set(-2, 4, 4, 0xffe14d).set(2, 4, 4, 0xffe14d); v.box(-1, 1, 4, 2, 2, 5, 0x264a80); return v; } },
   hazmat: { at: 'body', pos: [0, -0.02, 0], size: AS, make: () => { const v = new Vox(); v.rbox(-5, -1, -4, 5, 6, 4, 2, 0xffd23a); v.paint((vx) => (vx.y === 2 ? 0x15151a : undefined)); v.box(-1, 3, 4, 2, 5, 5, 0x15151a).set(0, 4, 5, 0xffd23a); return v; } },
@@ -178,7 +189,7 @@ const ITEMS: Record<Exclude<HandItem, null>, () => Vox> = {
 function itemMesh(id: Exclude<HandItem, null>) {
   const { solid, glow } = cachedVox('item:' + id, ITEMS[id], undefined, 0.05);
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(solid, itemMat));
+  if (solid.attributes.position) g.add(new THREE.Mesh(solid, itemMat));
   if (glow) g.add(new THREE.Mesh(glow, MAT.glow));
   return g;
 }
@@ -269,7 +280,8 @@ export class Alien {
     const mk = (part: string, f: () => Vox, origin?: [number, number, number]) => {
       const { solid, glow } = cachedVox(`${key}|${part}`, f, origin);
       const g = new THREE.Group();
-      const m = new THREE.Mesh(solid, this.mat); m.castShadow = true; g.add(m);
+      const m = new THREE.Mesh(solid, this.mat); m.castShadow = true;
+      if (solid.attributes.position) g.add(m);
       if (glow) g.add(new THREE.Mesh(glow, MAT.glow));
       g.userData.mesh = m;
       return g;

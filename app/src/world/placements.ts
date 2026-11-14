@@ -21,7 +21,7 @@ export class Placements {
   private ghost: { itemId: string; model: PlacedModel; rot: number } | null = null;
   private moving: Live | null = null;
   private hoverCell: [number, number] | null = null;
-  private lightBudget = 4;
+  private lightBudget = 2;
   onChange?: () => void;
 
   constructor(private grid: Grid, scene: THREE.Scene) {

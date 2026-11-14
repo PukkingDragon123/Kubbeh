@@ -3,12 +3,12 @@ import * as THREE from 'three';
 
 export class CameraRig {
   readonly camera: THREE.PerspectiveCamera;
-  target = new THREE.Vector3(0, 1.0, -0.6);
-  radius = 21;
+  target = new THREE.Vector3(0, 1.4, -0.4);
+  radius = 20.5;
   theta = 0;        // azimuth (0 = looking from +z toward -z)
-  phi = 1.05;       // polar from +y
+  phi = 1.13;       // polar from +y
   private goal = { target: this.target.clone(), radius: this.radius, theta: this.theta, phi: this.phi };
-  readonly home = { target: new THREE.Vector3(0, 1.0, -0.6), radius: 21, theta: 0, phi: 1.05 };
+  readonly home = { target: new THREE.Vector3(0, 1.4, -0.4), radius: 20.5, theta: 0, phi: 1.13 };
   private pointers = new Map<number, { x: number; y: number }>();
   private downAt: { x: number; y: number; t: number } | null = null;
   private dragDist = 0;
@@ -80,7 +80,7 @@ export class CameraRig {
   resize(w: number, h: number) {
     this.camera.aspect = w / h;
     // keep the lab framed on tall/narrow screens
-    this.camera.fov = w / h < 0.9 ? 52 : w / h < 1.3 ? 44 : 38;
+    this.camera.fov = w / h < 0.9 ? 54 : w / h < 1.3 ? 46 : 41;
     this.camera.updateProjectionMatrix();
   }
 

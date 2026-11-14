@@ -26,6 +26,7 @@ interface Ent {
   arrived: boolean;
 }
 
+const GLORP_SPOT = new THREE.Vector3(-6.2, 0, 3.15);
 const QUESTION_SPOTS = [new THREE.Vector3(0, 0, 5.6), new THREE.Vector3(-1.4, 0, 5.4), new THREE.Vector3(1.4, 0, 5.4)];
 
 export class CrewController {
@@ -65,12 +66,12 @@ export class CrewController {
       if (!look) continue;
       const alien = new Alien(look, { clone: m.role === 'clone' });
       alien.night = this.night;
-      if (m.role === 'clone') { alien.scaleK = 0.82; alien.root.scale.setScalar(0.01); }
+      alien.scaleK = m.role === 'clone' ? 1.05 : 1.3; alien.root.scale.setScalar(m.role === 'clone' ? 0.01 : 1.3);
       const e: Ent = { id: m.id, alien, member: m, key: '', spot: null, arriveAnim: 'idle', idleT: Math.random() * 3, fxT: 0, arrived: true };
       alien.onImpact = () => this.impact(e);
       // start positions
       if (m.role === 'clone') { alien.position.copy(this.stations.vat.spawnPoint); this.stations.vat.flash(); bus.emit('sfx', { name: 'portal', volume: 0.6 }); }
-      else if (m.id === PROFESSOR) alien.position.set(-6.2, 0, 1.55);
+      else if (m.id === PROFESSOR) alien.position.copy(GLORP_SPOT);
       else { const [ix, iz] = this.grid.randomFree(); alien.position.set(ix - 12 + 0.5, 0, iz - 8 + 0.5); }
       alien.heading = alien.targetHeading = Math.random() * Math.PI * 2 - Math.PI;
       this.scene.add(alien.root);
@@ -132,7 +133,7 @@ export class CrewController {
         break;
       }
       case 'thinking': case 'writing': case 'coding': {
-        if (isProf) { this.release(e); this.goTo(e, new THREE.Vector3(-6.2, 0, 1.55), 0, act === 'thinking' ? 'think' : 'present'); break; }
+        if (isProf) { this.release(e); this.goTo(e, GLORP_SPOT.clone(), 0, act === 'thinking' ? 'think' : 'present'); break; }
         const s = this.claim(e, (sp) => sp.station === 'computer') ?? this.claim(e, (sp) => sp.station === 'workbench');
         if (s) this.goTo(e, s.pos, s.face, act === 'thinking' ? 'think' : 'type'); else this.wander(e, 'think');
         break;
@@ -153,7 +154,7 @@ export class CrewController {
       case 'bugfix': { const s = this.claim(e, (sp) => sp.id === 'wb1') ?? this.claim(e, (sp) => sp.station === 'workbench'); if (s) { this.goTo(e, s.pos, s.face, 'whack'); a.hold('wrench'); } else this.wander(e, 'think'); break; }
       case 'building': { const s = this.claim(e, (sp) => sp.id === 'wb0') ?? this.claim(e, (sp) => sp.station === 'workbench'); if (s) { this.goTo(e, s.pos, s.face, 'hammer'); a.hold('hammer'); } else this.wander(e, 'think'); break; }
       case 'planning': {
-        if (isProf) { this.goTo(e, new THREE.Vector3(-6.2, 0, 1.55), 0, 'present'); break; }
+        if (isProf) { this.goTo(e, GLORP_SPOT.clone(), 0, 'present'); break; }
         const s = this.claim(e, (sp) => sp.station === 'whiteboard');
         if (s) { this.goTo(e, s.pos, s.face, 'scribble'); a.hold('chalk'); } else { const c = this.claim(e, (sp) => sp.station === 'computer'); if (c) this.goTo(e, c.pos, c.face, 'think'); }
         break;
@@ -167,7 +168,7 @@ export class CrewController {
       case 'sleeping': { const h = this.freeHangout(e, (x) => x.anim === 'sit' || x.anim === 'sleep'); if (h) this.goTo(e, h.pos, h.face, 'sleep'); else { a.path = []; a.anim = 'sleep'; e.arriveAnim = 'sleep'; e.arrived = true; } break; }
       default: {
         this.release(e);
-        if (isProf) { this.goTo(e, new THREE.Vector3(-6.2, 0, 1.55), 0, 'present'); break; }
+        if (isProf) { this.goTo(e, GLORP_SPOT.clone(), 0, 'present'); break; }
         e.idleT = 0.5 + Math.random() * 2;
         a.anim = 'idle'; e.arriveAnim = 'idle'; e.arrived = true;
       }

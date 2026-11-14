@@ -237,7 +237,7 @@ export const MODELS: Record<string, Maker> = {
   },
   slot_machine: () => {
     const g = new THREE.Group();
-    const v = new Vox(); v.rbox(-5, 0, -3, 5, 16, 3, 1, 0xb23a48).box(-4, 6, 3, 4, 11, 4, 0x111111).box(-5, 16, -2, 5, 18, 2, 0xffbe3d, 1.8).box(5, 6, -1, 6, 8, 1, 0x9aa69e).box(6, 8, 0, 7, 14, 1, 0x9aa69e).box(5, 14, -1, 8, 16, 2, 0xff3a3a, 1.2);
+    const v = new Vox(); v.rbox(-5, 0, -3, 5, 16, 3, 1, 0xb23a48).box(-4, 6, 3, 4, 11, 4, 0x111111).box(-5, 16, -2, 5, 18, 2, 0xffbe3d, 1.1).box(5, 6, -1, 6, 8, 1, 0x9aa69e).box(6, 8, 0, 7, 14, 1, 0x9aa69e).box(5, 14, -1, 8, 16, 2, 0xff3a3a, 1.2);
     for (let x = -4; x < 5; x += 2) v.set(x, 12, 3, x % 4 === 0 ? 0xffe14d : 0xff6fd6, 2.5);
     g.add(m(v));
     const syms = ['7', '★', '♥', '$', '?'];
@@ -247,7 +247,7 @@ export const MODELS: Record<string, Maker> = {
   },
   arcade_cab: () => {
     const g = new THREE.Group();
-    const v = new Vox(); v.box(-5, 0, -4, 5, 20, 4, 0x2a1650).box(-5, 8, 4, 5, 10, 7, 0x3e2470).box(-4, 11, 2, 4, 18, 4, 0x111111).box(-5, 18, -3, 5, 20, 4, 0x52f2ff, 1.6);
+    const v = new Vox(); v.box(-5, 0, -4, 5, 20, 4, 0x2a1650).box(-5, 8, 4, 5, 10, 7, 0x3e2470).box(-4, 11, 2, 4, 18, 4, 0x111111).box(-5, 18, -3, 5, 20, 4, 0x52f2ff, 1.1);
     v.set(-2, 10, 6, 0xff3a3a, 2.4).set(1, 10, 6, 0x8cf56b, 2.4).set(2, 10, 5, 0xffe14d, 2.4).box(-3, 10, 5, -2, 12, 6, 0x111111);
     v.paint((vx) => ((vx.x === -5 || vx.x === 4) && vx.y < 18 && (vx.y + vx.z) % 6 === 0 ? 0xff6fd6 : undefined));
     g.add(m(v));
@@ -304,18 +304,18 @@ export const MODELS: Record<string, Maker> = {
     const g = new THREE.Group();
     const v = new Vox(); v.cyl(0, 0, 2.6, 0, 1, 0x2b302d).box(0, 1, 0, 1, 18, 1, 0x56645e).box(0, 17, 0, 5, 18, 1, 0x56645e);
     for (let y = 0; y < 3; y++) v.cyl(5, 0, 1.6 + y, 14 - y, 15 - y, 0x2f6b4a, 0, y < 2 ? 1 : 0);
-    v.ellipsoid(5, 12, 0, 1.2, 1, 1.2, 0xffd38a, 3);
+    v.ellipsoid(5, 12, 0, 1.2, 1, 1.2, 0xffd38a, 1.6);
     g.add(m(v, true));
-    const light = new THREE.PointLight(0xffc77a, 6, 5, 1.6); light.position.set(5 * S, 1.3, 0); g.add(light);
+    const light = new THREE.PointLight(0xffc77a, 3, 5, 1.6); light.position.set(5 * S, 1.3, 0); g.add(light);
     return { group: g, w: 1, d: 1, light };
   },
   neon_tube: () => {
     const g = new THREE.Group();
     g.add(m(new Vox().box(-1, 0, -1, 1, 2, 1, 0x39433d).box(0, 2, 0, 1, 4, 1, 0x39433d), true));
-    const mat = glowMat(0xb48cff, 3);
+    const mat = glowMat(0xb48cff, 1.8);
     const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.6, 8), mat); tube.position.y = 0.5 + 0.8; g.add(tube);
     const light = new THREE.PointLight(0xb48cff, 4, 4, 1.6); light.position.y = 1.3; g.add(light);
-    return { group: g, w: 1, d: 1, light, update(_dt, t) { const k = 2.6 + Math.sin(t * 40) * 0.15; mat.color.setRGB(0.7 * k, 0.55 * k, k); } };
+    return { group: g, w: 1, d: 1, light, update(_dt, t) { const k = 1.6 + Math.sin(t * 40) * 0.1; mat.color.setRGB(0.7 * k, 0.55 * k, k); } };
   },
 };
 

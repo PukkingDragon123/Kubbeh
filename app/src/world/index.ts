@@ -39,10 +39,10 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
   const dprCap = () => (settings.value.quality === 'high' ? 2 : settings.value.quality === 'medium' ? 1.5 : 1);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap()));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.05;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = q === 'high';
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x080a14, 30, 110);
@@ -91,7 +91,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
     if (settings.value.quality === 'low') return;
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, rig.camera));
-    bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), settings.value.quality === 'high' ? 0.85 : 0.7, 0.55, 0.86);
+    bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), settings.value.quality === 'high' ? 0.55 : 0.45, 0.42, 0.93);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
     resize();
@@ -189,7 +189,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
     const p = placements.centerOfItem(target);
     if (p) return rig.focus(p.setY(0.9), 7);
   };
-  (window as any).__glob = { focus: focusImpl, rig, crewCtl, placements };
+  (window as any).__glob = { focus: focusImpl, rig, crewCtl, placements, renderer, scene };
 
   bus.on('ui:open', ({ panel }) => {
     if (settings.value.reduceMotion) return;
@@ -205,14 +205,17 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
   editMode.subscribe((on) => { if (on) rig.focus(new THREE.Vector3(0, 0, 0), 23, 0, 0.82); else rig.goHome(); });
 
   // ── loop ───────────────────────────────────────────────────────────────────
-  const clock = new THREE.Clock();
+  let lastNow = performance.now();
   let t = 0, frame = 0, ready = false, steamT = 0, dripT = 0, moteT = 0;
   const v3 = new THREE.Vector3();
   let lastAnchor = '';
+  let hoverAlien: string | null = null;
   const loop = () => {
     requestAnimationFrame(loop);
-    if (document.hidden) { clock.getDelta(); return; }
-    const dt = Math.min(0.05, clock.getDelta());
+    const now = performance.now();
+    const rawDt = (now - lastNow) / 1000; lastNow = now;
+    if (document.hidden) return;
+    const dt = Math.min(0.05, rawDt);
     t += dt; frame++;
     const reduce = settings.value.reduceMotion;
     rig.update(dt, t, reduce);
@@ -227,9 +230,10 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
       if (editMode.value) { placements.hover(floorPoint); canvas.style.cursor = 'crosshair'; overlay.hover(null, null, 0, 0); }
       else {
         const hit = pick();
+        hoverAlien = hit?.kind === 'alien' ? hit.id : null;
         let label: string | null = null, sub: string | null = null;
         if (hit?.kind === 'station') { label = hit.s.label; sub = hit.s.panel ? 'Click to open' : 'The crew works here'; }
-        else if (hit?.kind === 'alien') { const e = crewCtl.get(hit.id); label = e?.member.name ?? 'Alien'; sub = hit.id === PROFESSOR ? 'Click to brainstorm with him' : e?.member.label ?? 'Poke me'; }
+        else if (hit?.kind === 'alien') { label = null; }
         else if (hit?.kind === 'placement') { const pp = placements.placementOf(hit.o); label = pp ? pp.p.itemId.replace(/_/g, ' ').toUpperCase() : null; sub = placements.panelOf(hit.o) ? 'Click to play' : 'Click to interact'; }
         else if (hit?.kind === 'ufo') { label = 'U.F.O.'; sub = 'Do not poke'; }
         canvas.style.cursor = hit ? 'pointer' : 'grab';
@@ -272,7 +276,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
     // name tags
     if (frame % 2 === 0) {
       const r = canvas.getBoundingClientRect();
-      const hovered = (() => { if (!pointerIn || editMode.value) return null; return null; })();
+      const hovered = pointerIn && !editMode.value ? hoverAlien : null;
       overlay.tagsUpdate(crewCtl.tags().map((tg) => {
         tg.pos.project(rig.camera);
         const x = (tg.pos.x * 0.5 + 0.5) * r.width + r.left, y = (-tg.pos.y * 0.5 + 0.5) * r.height + r.top - 4;

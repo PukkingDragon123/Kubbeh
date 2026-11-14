@@ -182,9 +182,9 @@ function ideaDesk(): Station {
   g.add(board, chalkM);
   const hit = hitBox(2.6, 1.4, 1.2); g.add(hit);
   const lbl = label('IDEA LAB', '#ffe27a'); lbl.position.set(0, 3.2, -1.05); g.add(lbl);
-  g.position.set(-6.2, 0, 2.3);
-  const spots: Spot[] = [{ id: 'glorp', station: 'idea', pos: new THREE.Vector3(-6.2, 0, 1.55), face: 0, anim: 'present' }];
-  return { id: 'idea', label: "Prof. Glorp's Idea Lab", panel: 'idea', group: g, pick: [hit, desk, board], rect: [-7.6, 0.9, -4.8, 2.9], anchor: new THREE.Vector3(-6.2, 1.1, 1.8), spots };
+  g.position.set(-6.2, 0, 2.0);
+  const spots: Spot[] = [{ id: 'glorp', station: 'idea', pos: new THREE.Vector3(-6.2, 0, 3.15), face: 0, anim: 'present' }];
+  return { id: 'idea', label: "Prof. Glorp's Idea Lab", panel: 'idea', group: g, pick: [hit, desk, board], rect: [-7.6, 0.7, -4.8, 2.6], anchor: new THREE.Vector3(-6.2, 1.1, 2.8), spots };
 }
 
 // ── FUEL TANK ────────────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ const LIQUID_FRAG = /* glsl */ `
     float swirl = sin(vUv.x * 18.0 + uTime * 1.5 + vUv.y * 9.0) * 0.06;
     c += stripe + swirl;
     c = mix(c, vec3(1.0, 0.25, 0.2), uAlarm * (0.5 + 0.5 * sin(uTime * 8.0)) * 0.35);
-    gl_FragColor = vec4(c * 1.35, 0.92);
+    gl_FragColor = vec4(c * 0.95, 0.8);
   }`;
 const LIQUID_VERT = /* glsl */ `varying vec2 vUv; varying vec3 vPos; void main(){ vUv = uv; vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 
@@ -333,7 +333,6 @@ function vending(): Station {
   });
   const scr = screenMesh(10 * S, 15 * S, front, 1.25); scr.position.set(0, 9.5 * S, 4.5 * S + 0.04); g.add(scr);
   const sign = neonText('GENE-O-MAT', [0xff6fd6, 0x8cf56b], 0.034, 3.2); sign.group.position.set(-0.6 * 1.6 / 1.6 - 0.18, 18.2 * S, 4.5 * S + 0.06); g.add(sign.group);
-  const light = new THREE.PointLight(0xff6fd6, 5, 5, 1.6); light.position.set(0, 1.4, 1.4); g.add(light);
   const hit = hitBox(1.6, 2.6, 1.2); g.add(hit);
   const lbl = label('SHOP', '#ff6fd6'); lbl.position.set(0, 2.95, 0.3); g.add(lbl);
   g.position.set(11.0, 0, -1.4); g.rotation.y = -Math.PI / 2;

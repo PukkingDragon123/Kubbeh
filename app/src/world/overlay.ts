@@ -24,7 +24,7 @@ const CSS = `
 .gl-edit button{font-family:inherit;font-size:12px;border:0;border-radius:10px;padding:6px 10px;cursor:pointer;background:#2b3631;color:#e8ffe6;box-shadow:inset 0 1px 0 #ffffff30,0 3px 0 #1a211d}
 .gl-edit button[aria-pressed=true]{background:#8cf56b;color:#062a08}
 .gl-edit button.done{background:#8cf56b;color:#062a08}
-.gl-edit .hint{font-family:'Rubik',system-ui,sans-serif;font-size:11px;color:#a9c9af;padding:0 6px}
+.gl-edit .hint{font-family:'Rubik',system-ui,sans-serif;font-size:11px;color:#a9c9af;padding:3px 9px;background:#0b100dd9;border-radius:8px}
 `;
 
 export class Overlay {

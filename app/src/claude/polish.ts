@@ -75,6 +75,8 @@ export function keyTerms(text: string): string[] {
   for (const m of text.matchAll(/"([^"\n]{1,120})"|“([^”\n]{1,120})”/g)) add(m[1] ?? m[2]);
   for (const m of text.matchAll(/https?:\/\/\S+/g)) add(m[0].replace(/[).,]+$/, ''));
   for (const m of text.matchAll(/\b\d+(?:[.,]\d+)?\s?(?:%|px|ms|s|fps|k|kb|mb|gb|x)?\b/gi)) add(m[0]);
+  // single digits only make sense with the word they count ("3 enemy")
+  for (const m of text.matchAll(/\b(\d)\s+([a-z]{3,})\b/gi)) add(`${m[1]} ${m[2]}`);
   for (const m of text.matchAll(/\b[\w./-]+\.(?:ts|tsx|js|jsx|py|cs|cpp|h|rs|go|lua|gd|json|md|html|css|png|wav|mp3|glb|gltf|unity|tscn)\b/gi)) add(m[0]);
   for (const m of text.matchAll(/\b[A-Z][A-Z0-9]{2,}(?:\s+[A-Z][A-Z0-9]{2,})*\b/g)) add(m[0]);
   for (const m of text.matchAll(/(?<=[a-z,;:]\s)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g)) add(m[1]);
@@ -96,7 +98,7 @@ export async function polishPrompt(text: string, opts: { aggressive?: boolean; s
       const r = rewritten.replace(/^```\w*\n?|```$/g, '').trim();
       // accept the rewrite unless it ballooned
       if (r && estimateTokens(r) <= Math.max(before * 1.15, before + 40)) {
-        out = r; usedModel = true; notes.push('Fixed typos & organized');
+        out = localCompress(r, opts.aggressive); usedModel = true; notes.push('Fixed typos & organized');
       }
     } catch (err: any) {
       if (err?.code === 'cancelled') throw err;

@@ -416,7 +416,7 @@ async function autoTitle(chat: Chat, firstPrompt: string) {
   // claude.ai usage is the viewer's plan: keep the free local title there
   if (!eng || eng.kind !== 'api' || mockMode) return;
   try {
-    const t = await complete({ prompt: firstPrompt.slice(0, 1500), system: TITLE_SYSTEM, maxTokens: 30, source: 'title' });
+    const t = await complete({ prompt: firstPrompt.slice(0, 1500), system: TITLE_SYSTEM, maxTokens: 400, source: 'title' });
     const clean = t.replace(/^["'#\s]+|["'.\s]+$/g, '').slice(0, 60);
     if (clean) { chat.title = clean; saveChat(chat); }
   } catch { /* keep local title */ }

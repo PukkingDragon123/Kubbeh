@@ -137,7 +137,7 @@ export function Composer({ placeholder, autofocus, compact }: { placeholder?: st
             </div>
             <div class="row">
               <Btn size="sm" tone="ghost" onClick={() => { setPolish(null); sfx('panel_close', .3); }}>Keep mine</Btn>
-              <Btn size="sm" tone="glob" icon="check" onClick={() => { setUndo(polish.original); setText(polish.text); setPolish(null); sfx('select', .5); }}>Use polished</Btn>
+              <Btn size="sm" tone="glob" icon="check" onClick={() => { setUndo(polish.original); setText(polish.text); setPolish(null); sfx('select', .5); setTimeout(() => ta.current?.focus(), 30); }}>Use polished</Btn>
             </div>
           </div>
           {!!polish.notes.length && <div class="dim ws-small">{polish.notes.join(' · ')}{polish.missing.length ? ` — kept: ${polish.missing.slice(0, 6).join(', ')}` : ''}</div>}

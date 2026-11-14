@@ -1,0 +1,25 @@
+/* Floating lab widget (Picture-in-Picture window, popup, or in-page fallback) */
+.glw { display: flex; flex-direction: column; gap: 6px; width: 100%; height: 100%; padding: 8px; color: var(--text); font: 400 12px/1.35 var(--font-body);
+  background: linear-gradient(180deg, var(--metal-hi), var(--metal) 18%, var(--metal-lo)); user-select: none; }
+.glw-head { display: flex; align-items: center; gap: 6px; }
+.glw-logo { font: 700 13px var(--font-display); letter-spacing: .1em; color: var(--glob); text-shadow: 0 0 8px #8cf56b99; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.glw-logo b { color: var(--pink); text-shadow: 0 0 8px #ff6fd699; }
+.glw-genes { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font: 700 12px var(--font-display); color: var(--glob); }
+.glw-btn { border: 0; cursor: pointer; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: #ffffff12; color: var(--text-2); }
+.glw-btn:hover { background: #ffffff22; color: var(--text); }
+.glw-screen { position: relative; border-radius: 10px; overflow: hidden; box-shadow: inset 0 0 0 2px #000, 0 0 0 2px #2c3a31; background: #070c09; flex: none; }
+.glw-screen canvas { display: block; width: 100%; image-rendering: pixelated; }
+.glw-status { min-height: 30px; display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+.glw-status div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.glw-status b { color: var(--glob); }
+.glw-row { display: grid; grid-template-columns: 52px 1fr auto; gap: 6px; align-items: center; font-size: 11px; }
+.glw-row .k { font: 700 9.5px var(--font-display); letter-spacing: .12em; color: var(--text-3); text-transform: uppercase; }
+.glw-bar { position: relative; height: 9px; border-radius: 5px; background: #050a07; box-shadow: inset 0 2px 3px #000c; overflow: hidden; }
+.glw-bar > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; transition: width .6s; }
+.glw-bar > b { position: absolute; top: 0; bottom: 0; width: 1px; background: #ffffff55; }
+.glw-bar.blink > i { animation: blink-warn .8s steps(1) infinite; }
+
+/* in-page fallback */
+.glw-float { position: fixed; z-index: 70; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); width: 300px; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 0 0 2px #0b100d, 0 18px 40px #000c, 0 0 40px #8cf56b22; pointer-events: auto; animation: pop-in .35s var(--ease-jelly); }
+.glw-float .glw-head { cursor: grab; }

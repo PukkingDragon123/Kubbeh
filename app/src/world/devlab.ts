@@ -78,17 +78,17 @@ export async function runShipLab(mode: string, r: THREE.WebGLRenderer, scene: TH
   });
   // triangle budget report (instanced meshes count every instance)
   let tris = 0, meshes = 0, lights = 0;
-  scene.traverse((o) => {
+  scene.traverseVisible((o) => {
     const m = o as THREE.Mesh;
     if ((o as THREE.Light).isLight) lights++;
-    if (!m.isMesh || !m.visible) return;
+    if (!m.isMesh) return;
     meshes++;
     const g = m.geometry; const n = (g.index ? g.index.count : g.attributes.position.count) / 3;
     tris += n * ((m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1);
   });
   const by: Record<string, number> = {};
-  const count = (root: THREE.Object3D, label: string) => { let n = 0; root.traverse((o) => { const m = o as THREE.Mesh; if (!m.isMesh || !m.visible) return; const g = m.geometry; n += ((g.index ? g.index.count : g.attributes.position.count) / 3) * ((m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1); }); by[label] = (by[label] ?? 0) + Math.round(n); };
-  env.group.children.forEach((c, i) => count(c, 'env:' + (c.name || c.type) + ':' + i));
+  const count = (root: THREE.Object3D, label: string) => { let n = 0; root.traverseVisible((o) => { const m = o as THREE.Mesh; if (!m.isMesh) return; const g = m.geometry; n += ((g.index ? g.index.count : g.attributes.position.count) / 3) * ((m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1); }); by[label] = (by[label] ?? 0) + Math.round(n); };
+  env.group.children.forEach((c, i) => count(c, 'env:' + (c.name || c.type) + ':' + i + ':' + (c.children[0]?.name ?? '')));
   st.list.forEach((s2) => count(s2.group, 'station:' + s2.id));
   aliens.forEach((a, i) => count(a.root, 'alien' + i));
   const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 26);

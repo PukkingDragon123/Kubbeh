@@ -202,7 +202,7 @@ function LeverView({ pulledAt }: { pulledAt: number }) {
   const at = useRef(pulledAt);
   at.current = pulledAt;
   return (
-    <VoxView width={52} height={190} spin="always" cacheKey="slot-lever" yaw={-0.55} pitch={0.08} fill={0.98} make={() => buildLever()}
+    <VoxView width={52} height={190} spin="always" cacheKey="slot-lever" yaw={-0.55} pitch={0.08} fill={3.3} make={() => buildLever()}
       animate={(o: THREE.Object3D, t: number) => {
         const rod = (o as any).userData.rod as THREE.Object3D | undefined;
         if (!rod) return;

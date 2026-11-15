@@ -3,7 +3,7 @@
 // All modules are built facing +z (toward the room) with their origin at bottom-centre.
 import * as THREE from 'three';
 import { M, S, VoxGrid, hash3, mix, shade, fbm } from '../core';
-import { PAL, U, grid, mesh, plate, hazard, grateCell, plateTint, stampText, textWidth, glowMat, GLOW } from './kit';
+import { PAL, U, grid, mesh, plate, hazard, grateCell, plateTint, stampText, textWidth, glowMat, GLOW, occluderPlane } from './kit';
 
 const named = (o: THREE.Object3D, n: string) => { o.name = n; return o; };
 
@@ -36,7 +36,7 @@ export function floorTile(kind: TileKind): THREE.Object3D {
   }
   if (kind === 'hazard') for (let x = 2; x < 30; x++) for (let z = 2; z < 30; z++) if (z < 26) g.set(x, -1, z, hazard(x, z, 4), M.solid);
   if (kind === 'lightline') for (let x = 2; x < 30; x++) if (Math.floor(x / 4) % 2 === 0) { g.set(x, -1, 15, 0xffffff, M.glow); g.set(x, -1, 16, 0xffffff, M.glow); }
-  const o = mesh(g, { castShadow: false });
+  const o = mesh(g, { castShadow: false, occluder: occluderPlane(g, '-y') });
   if (kind === 'lightline') o.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = glowMat(PAL.glob, 0.9); m.name = 'floorGlow'; } });
   return o;
 }
@@ -101,7 +101,7 @@ export function wallPanel(kind: WallKind, seed = 0): THREE.Object3D {
       break;
     }
   }
-  return mesh(g, { castShadow: false });
+  return mesh(g, { castShadow: false, occluder: occluderPlane(g, '-z') });
 }
 
 /** Structural rib between wall panels: 6 wide, 102 tall, protrudes 5. */
@@ -125,7 +125,7 @@ export function backLower(kind: 'plain' | 'vent' | 'conduit'): THREE.Object3D {
   if (kind === 'vent') for (let y = 12; y < 26; y += 2) g.add(S.box([8, y, 0], [24, y + 1, 1]), PAL.hullDeep, M.metal);
   if (kind === 'conduit') { g.add(S.capsule([0, 30, 1], [32, 30, 1], 1.4), PAL.paintTeal, M.metal); g.add(S.capsule([0, 26, 1], [32, 26, 1], 1), PAL.steel, M.metal); }
   g.add(S.box([0, 34, 0], [32, 36, 1.4]), PAL.hullHi, M.metal);
-  return mesh(g, { castShadow: false });
+  return mesh(g, { castShadow: false, occluder: occluderPlane(g, '-z') });
 }
 
 /** Window bay: 64 wide × 52 tall frame (4 × 3.25 world units) — glass is separate. */
@@ -145,7 +145,7 @@ export function windowBay(): THREE.Object3D {
   g.add(S.box([30.5, 5, -2], [33.5, 47, 2.6]), PAL.hullHi, M.metal);   // mullion
   for (let i = 0; i < 10; i++) { g.add(S.sphere([3, 5 + i * 4.6, 2.4], 0.7), PAL.chrome, M.metal); g.add(S.sphere([61, 5 + i * 4.6, 2.4], 0.7), PAL.chrome, M.metal); }
   for (let i = 0; i < 14; i++) { g.add(S.sphere([5 + i * 4.1, 2.6, 2.4], 0.7), PAL.chrome, M.metal); g.add(S.sphere([5 + i * 4.1, 49.4, 2.4], 0.7), PAL.chrome, M.metal); }
-  return mesh(g, { castShadow: false });
+  return mesh(g, { castShadow: false, occluder: occluderPlane(g, '-z') });
 }
 
 /** Upper back trim with a cable tray and light bar: 32 wide × 20 tall. */
@@ -156,7 +156,7 @@ export function upperTrim(): THREE.Object3D {
   for (let x = 1; x < 32; x += 4) g.add(S.box([x, 6, 0.5], [x + 0.8, 9, 5]), PAL.steelDark, M.metal);
   for (const [z, c] of [[1.6, PAL.cable], [2.8, PAL.paintRed], [4, PAL.cable]] as [number, number][]) g.add(S.capsule([0, 7, z], [32, 7.4, z], 0.6), c, M.solid);
   g.add(S.box([2, 14, 0], [30, 16, 1.4]), 0xffffff, M.glow);
-  const o = mesh(g, { castShadow: false });
+  const o = mesh(g, { castShadow: false, occluder: occluderPlane(g, '-z') });
   o.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = glowMat(0xb8f0e0, 0.75); } });
   return o;
 }

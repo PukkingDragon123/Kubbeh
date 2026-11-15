@@ -6,7 +6,7 @@
 // and sampled at `res` voxels per unit (res 2 → 1/32 world unit voxels).
 import * as THREE from 'three';
 import { M, VoxGrid, hash3, mix, shade, type V3 } from '../core';
-import { toObject, type BuildOptions } from '../mesh';
+import { toObject, materials, type BuildOptions } from '../mesh';
 
 /** world units per model unit */
 export const U = 1 / 16;
@@ -102,9 +102,134 @@ export function textWidth(text: string, s: number) {
 /** Glow voxels on props render brighter than 1.0 so the bloom pass picks them up. */
 export const GLOW = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.9, 1.9, 1.9), toneMapped: false });
 
-/** Mesh a prop grid in ship units (16 model units = 1 world unit). */
+/** Mesh a prop grid in ship units (16 model units = 1 world unit). Greedy-merged unless it needs an outline / anchor. */
 export function mesh(g: VoxGrid, o: Omit<BuildOptions, 'size'> & { anchor?: 'none' | 'bottom' | 'center' } = {}): THREE.Group {
-  return toObject(g, { size: U, ao: 0.8, castShadow: true, anchor: o.anchor ?? 'none', ...o, override: { [M.glow]: GLOW, ...(o.override ?? {}) } });
+  const override = { [M.glow]: GLOW, ...(o.override ?? {}) };
+  if (o.outline === undefined && (o.anchor ?? 'none') === 'none') return greedy(g, { ao: 0.8, castShadow: true, ...o, override });
+  return toObject(g, { size: U, ao: 0.8, castShadow: true, anchor: o.anchor ?? 'none', ...o, override });
+}
+
+// ── greedy mesher ────────────────────────────────────────────────────────────
+// Same look as the engine's per-voxel mesher (vertex colours, baked AO, per-material
+// geometry, glass rules), but coplanar faces with identical colour, material and corner
+// AO are merged into big quads. Flat hull plates drop from ~2k quads to a few dozen.
+const LIN = new Float32Array(256).map((_, i) => { const c = i / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); });
+const AO_CURVE = [1, 0.8, 0.66, 0.52];
+const isGlass = (m: number) => m === M.glass;
+
+export function greedy(g: VoxGrid, o: { ao?: number; castShadow?: boolean; occluder?: VoxGrid; override?: Partial<Record<number, THREE.Material>>; name?: string } = {}): THREE.Group {
+  const size = U / (g.res || 1);
+  const aoK = o.ao ?? 0.8;
+  const occ = o.occluder;
+  const filled = (x: number, y: number, z: number) => g.get(x, y, z) || (occ ? occ.get(x, y, z) : 0);
+  const solidAt = (x: number, y: number, z: number) => { const m = filled(x, y, z); return m !== 0 && !isGlass(m); };
+  const dims = [g.w, g.h, g.d];
+  const org = g.o;
+  const buckets = new Map<number, { pos: number[]; nor: number[]; col: number[]; idx: number[] }>();
+  const bucket = (m: number) => { let b = buckets.get(m); if (!b) buckets.set(m, (b = { pos: [], nor: [], col: [], idx: [] })); return b; };
+
+  for (let d = 0; d < 3; d++) {
+    const u = (d + 1) % 3, v = (d + 2) % 3;
+    const W = dims[u], H = dims[v];
+    const keys = new Float64Array(W * H);
+    const aoq = new Uint8Array(W * H * 4);
+    const cell = new Int32Array(W * H);   // voxel colour
+    const mats = new Uint8Array(W * H);
+    for (const s of [1, -1]) {
+      for (let k = 0; k < dims[d]; k++) {
+        keys.fill(0);
+        const p = [0, 0, 0];
+        for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+          p[d] = k; p[u] = i; p[v] = j;
+          const x = p[0] + org[0], y = p[1] + org[1], z = p[2] + org[2];
+          const m = g.get(x, y, z);
+          if (!m) continue;
+          const n = [x, y, z]; n[d] += s;
+          const nm = filled(n[0], n[1], n[2]);
+          if (nm && (!isGlass(nm) || isGlass(m))) continue;
+          const c = g.color(x, y, z);
+          // corner AO (occlusion counts 0..3) in order (0,0) (1,0) (1,1) (0,1)
+          const a4 = [0, 0, 0, 0];
+          if (m !== M.glow && aoK > 0) {
+            const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+            for (let q = 0; q < 4; q++) {
+              const [su, sv] = corners[q];
+              const A = [...n], Bv = [...n], C = [...n];
+              A[u] += su; Bv[v] += sv; C[u] += su; C[v] += sv;
+              const s1 = solidAt(A[0], A[1], A[2]) ? 1 : 0, s2 = solidAt(Bv[0], Bv[1], Bv[2]) ? 1 : 0, s3 = solidAt(C[0], C[1], C[2]) ? 1 : 0;
+              a4[q] = s1 && s2 ? 3 : s1 + s2 + s3;
+            }
+          }
+          const id = j * W + i;
+          cell[id] = c; mats[id] = m;
+          aoq.set(a4, id * 4);
+          keys[id] = m * 1e10 + c * 300 + a4[0] * 64 + a4[1] * 16 + a4[2] * 4 + a4[3] + 1;
+        }
+        // greedy rectangles
+        for (let j = 0; j < H; j++) for (let i = 0; i < W; ) {
+          const id = j * W + i, key = keys[id];
+          if (!key) { i++; continue; }
+          let w = 1; while (i + w < W && keys[id + w] === key) w++;
+          let h = 1;
+          outer: while (j + h < H) { for (let q = 0; q < w; q++) if (keys[(j + h) * W + i + q] !== key) break outer; h++; }
+          for (let jj = 0; jj < h; jj++) for (let q = 0; q < w; q++) keys[(j + jj) * W + i + q] = 0;
+          // emit
+          const m = mats[id], c = cell[id];
+          const B = bucket(m);
+          const base = B.pos.length / 3;
+          const plane = k + (s > 0 ? 1 : 0);
+          const corner = (cu: number, cv: number) => { const P = [0, 0, 0]; P[d] = plane; P[u] = i + cu; P[v] = j + cv; return [(P[0] + org[0]) * size, (P[1] + org[1]) * size, (P[2] + org[2]) * size]; };
+          const cs = [corner(0, 0), corner(w, 0), corner(w, h), corner(0, h)];
+          const r = LIN[(c >> 16) & 255], gg = LIN[(c >> 8) & 255], b = LIN[c & 255];
+          const nrm = [0, 0, 0]; nrm[d] = s;
+          const tint = d === 1 ? (s > 0 ? 1.04 : 0.9) : 1;
+          const ao = [0, 1, 2, 3].map((q) => 1 - (1 - AO_CURVE[aoq[id * 4 + q]]) * aoK);
+          const order = s > 0 ? [0, 1, 2, 3] : [0, 3, 2, 1];
+          for (const q of order) { B.pos.push(...cs[q]); B.nor.push(nrm[0], nrm[1], nrm[2]); const a = ao[q] * tint; B.col.push(r * a, gg * a, b * a); }
+          const aoO = order.map((q) => ao[q]);
+          if (aoO[0] + aoO[2] > aoO[1] + aoO[3]) B.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+          else B.idx.push(base + 1, base + 2, base + 3, base + 1, base + 3, base);
+          i += w;
+        }
+      }
+    }
+  }
+  const group = new THREE.Group();
+  group.name = o.name ?? 'vox';
+  const mt = materials();
+  for (const [m, B] of buckets) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(B.pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(B.nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(B.col, 3));
+    geo.setIndex(B.pos.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(B.idx, 1) : new THREE.Uint16BufferAttribute(B.idx, 1));
+    geo.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geo, o.override?.[m] ?? mt[m] ?? mt[M.solid]);
+    mesh.castShadow = !!o.castShadow && m !== M.glass && m !== M.glow;
+    mesh.receiveShadow = m !== M.glow;
+    if (m === M.glass) mesh.renderOrder = 2;
+    mesh.userData.voxMat = m;
+    group.add(mesh);
+  }
+  group.userData.voxSize = size;
+  return group;
+}
+
+/**
+ * An occluder plane just outside one side of a grid: faces pointing into it are culled by
+ * the mesher (floor undersides, wall backs — surfaces the camera can never see).
+ */
+export function occluderPlane(g: VoxGrid, side: '-y' | '-z' | '+z' | '-x' | '+x'): VoxGrid {
+  const o: V3 = [...g.o] as V3;
+  let w = g.w, h = g.h, d = g.d;
+  if (side === '-y') { o[1] = g.o[1] - 1; h = 1; }
+  if (side === '-z') { o[2] = g.o[2] - 1; d = 1; }
+  if (side === '+z') { o[2] = g.o[2] + g.d; d = 1; }
+  if (side === '-x') { o[0] = g.o[0] - 1; w = 1; }
+  if (side === '+x') { o[0] = g.o[0] + g.w; w = 1; }
+  const p = new VoxGrid(w, h, d, o, g.res);
+  p.mat.fill(M.solid);
+  return p;
 }
 
 /** New grid spanning model-unit bounds at `res` voxels per unit. */

@@ -32,7 +32,10 @@ async function boot() {
   setTimeout(() => bootEl?.remove(), 600);
 }
 
-boot().catch((err) => {
+const voxlab = new URLSearchParams(location.search).get('voxlab');
+if (voxlab) {
+  import('./dev/voxlab').then((m) => m.runVoxLab(voxlab));
+} else boot().catch((err) => {
   console.error(err);
   const el = document.querySelector('#boot .boot-text');
   if (el) el.textContent = 'THE LAB FAILED TO BOOT — ' + String(err?.message ?? err);

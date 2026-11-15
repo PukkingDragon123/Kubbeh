@@ -249,14 +249,14 @@ function Game() {
         onPointerLeave={() => { input.current.pointerX = null; }}>
         <canvas ref={cv} />
         <div class="arcade-hud">
-          <span class="arcade-score tnum">{score}</span>
+          <span class="arcade-score">{score}</span>
           {combo >= 5 && <span class="arcade-combo">×{1 + Math.min(4, Math.floor(combo / 5))}</span>}
           <span class="arcade-lives">{[0, 1, 2].map((i) => <VoxView key={i} size={26} cacheKey={`arcade-heart:${i < lives}`} make={() => framed(heart())} class={i < lives ? '' : 'lost'} yaw={-0.2} pitch={0.1} fill={0.98} />)}</span>
         </div>
         {state !== 'play' && (
           <div class="arcade-overlay">
             <h3 class="arcade-title">{state === 'over' ? 'GAME OVER' : 'UFO CATCH'}</h3>
-            {state === 'over' ? <div class="col gap-4"><span class="arcade-big tnum">{score}</span><span class="dim">HI {Math.max(high, score)} · +{earned} genes</span></div>
+            {state === 'over' ? <div class="col gap-4"><span class="arcade-big">{score}</span><span class="dim">HI {Math.max(high, score)} · +{earned} genes</span></div>
               : <span class="dim">←/→ · A/D · drag</span>}
             <Btn tone="pink" size="lg" icon="play" onClick={start}>{state === 'over' ? 'Again' : 'Play'}</Btn>
           </div>

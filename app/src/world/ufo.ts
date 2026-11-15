@@ -53,7 +53,7 @@ export class Ufo {
     this.lightMat = glowMat(color ?? COLORS[idx % 3], 2);
     this.model.getObjectByName('lights')!.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = this.lightMat; });
     this.group.add(this.model);
-    this.group.userData.ufo = this;
+    Object.defineProperty(this.group.userData, 'ufo', { value: this, enumerable: false, configurable: true, writable: true });
     this.x = -30 + idx * 22;
     this.speed = 1.6 + idx * 0.7;
     this.y0 = -1.2 - idx * 1.6;

@@ -704,7 +704,8 @@ export function buildAlien(look: AlienLook, size = 0.016): AlienParts {
     },
     dispose() { root.removeFromParent(); },
   };
-  root.userData.alienParts = parts;
+  // non-enumerable: three.js clone() JSON-copies userData, and parts points back at root
+  Object.defineProperty(root.userData, 'alienParts', { value: parts, enumerable: false, configurable: true, writable: true });
   return parts;
 }
 

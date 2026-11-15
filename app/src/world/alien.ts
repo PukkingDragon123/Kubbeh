@@ -58,7 +58,7 @@ export class Alien {
     this.shadow.rotation.x = -Math.PI / 2; this.shadow.position.y = 0.012; this.shadow.renderOrder = 1;
     this.root.add(this.shadow);
     this.build();
-    this.root.userData.alien = this;
+    Object.defineProperty(this.root.userData, 'alien', { value: this, enumerable: false, configurable: true, writable: true });
   }
 
   private build() {

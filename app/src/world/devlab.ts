@@ -16,7 +16,7 @@ export async function runShipLab(mode: string, r: THREE.WebGLRenderer, scene: TH
   scene.background = new THREE.Color(0x03040b);
   scene.fog = new THREE.Fog(0x060814, 36, 130);
   scene.environment = studioEnvironment(r);
-  scene.environmentIntensity = 0.42;
+  scene.environmentIntensity = 0.16;
   const q = new URLSearchParams(location.search);
   const level = q.has('fuel') ? +q.get('fuel')! : 0.62;
   fuel.value = { ...fuel.value, level, tier: level > 0.5 ? 'full' : level > 0.25 ? 'half' : level > 0.1 ? 'quarter' : 'critical' };
@@ -64,6 +64,7 @@ export async function runShipLab(mode: string, r: THREE.WebGLRenderer, scene: TH
   post.lowResH = q.has('res') ? +q.get('res')! : 440;
   post.setSize(innerWidth, innerHeight, 1);
   setPost(post);
+  if (q.has('inkdbg')) (await import('./post')).POST.uInkOn.value = 2;
   fx.setViewport(post.h, cam.fov);
   r.shadowMap.enabled = true;
   let n = 0, t = 3;
@@ -75,7 +76,7 @@ export async function runShipLab(mode: string, r: THREE.WebGLRenderer, scene: TH
     for (const u of ufos) u.update(dt, t, fx);
     fx.setCamera(cam); fx.update(dt, t);
     post.render(scene, cam);
-    if (++n > 2) { r.setAnimationLoop(null); (window as any).__voxlabDone = true; }
+    if (++n > 2) { r.setAnimationLoop(null); (window as any).__inkPixels = post.debugInk(); let inkMeshes = 0; scene.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.layers.isEnabled(1)) inkMeshes++; }); (window as any).__inkMeshes = inkMeshes; (window as any).__voxlabDone = true; }
   });
   // triangle budget report (instanced meshes count every instance)
   let tris = 0, meshes = 0, lights = 0;

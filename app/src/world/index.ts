@@ -46,7 +46,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
   scene.fog = new THREE.Fog(0x060814, 36, 130);
   scene.background = new THREE.Color(0x03040b);
   scene.environment = studioEnvironment(renderer);
-  scene.environmentIntensity = 0.42;
+  scene.environmentIntensity = 0.16;
 
   const rig = new CameraRig(canvas);
   const fx = new Particles();

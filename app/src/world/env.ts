@@ -114,7 +114,7 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   const lampSpots: [number, number][] = [[-5.5, -6.9], [5.5, -6.9]];
   group.add(instance(hangingLamp(), lampSpots.map(([x, z]) => at(x, ROOM.wallH + 0.4, z))));
   const lamps: THREE.PointLight[] = [];
-  for (const [x, y, z, i] of [[-5.5, 5.4, -6.6, 6], [5.5, 5.4, -6.6, 6], [-5, 5.2, 1.8, 7], [4, 5.2, 2.2, 7]] as [number, number, number, number][]) {
+  for (const [x, y, z, i] of [[-5.5, 5.4, -6.6, 9], [5.5, 5.4, -6.6, 9], [-5, 5.2, 1.8, 10], [4, 5.2, 2.2, 10]] as [number, number, number, number][]) {
     const l = new THREE.PointLight(0xffd29a, i, 11, 1.3);
     l.position.set(x, y, z);
     group.add(l); lamps.push(l);
@@ -196,9 +196,9 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   group.add(space);
 
   // ── lights ────────────────────────────────────────────────────────────────────
-  const hemi = new THREE.HemisphereLight(0xb8c8e0, 0x2a2420, 0.7);
+  const hemi = new THREE.HemisphereLight(0xa8bce0, 0x231c18, 0.42);
   group.add(hemi);
-  const key = new THREE.DirectionalLight(0xfff0dc, 1.15);
+  const key = new THREE.DirectionalLight(0xffecd4, 1.55);
   key.position.set(-8, 14, 12); key.target.position.set(0, 0, -1);
   key.castShadow = quality === 'high';
   if (key.castShadow) {
@@ -207,7 +207,7 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
     key.shadow.bias = -0.0006; key.shadow.normalBias = 0.02;
   }
   group.add(key, key.target);
-  const spaceLight = new THREE.DirectionalLight(0x9fc8ff, 0.8);
+  const spaceLight = new THREE.DirectionalLight(0x8fb8ff, 1.0);
   spaceLight.position.set(4, 4, -20); spaceLight.target.position.set(0, 0, 4);
   group.add(spaceLight, spaceLight.target);
 

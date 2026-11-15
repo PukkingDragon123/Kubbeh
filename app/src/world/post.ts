@@ -76,12 +76,14 @@ void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);
   vec3 col = texelFetch(tSrc, p, 0).rgb + texture(tBloom, vUv).rgb * uBloom;
   // ink outline: an alien silhouette pixel next to us that is visible and in front of what we show
+  vec4 best = vec4(0.0);
   if (uInkOn > 0.5 && texelFetch(tInk, p, 0).a <= 0.0) {
     float here = viewDist(texelFetch(tDepth, p, 0).r);
-    ivec2 offs[4] = ivec2[4](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1));
-    vec4 best = vec4(0.0); float bestD = 1e9;
-    for (int i = 0; i < 4; i++) {
-      ivec2 q = p + offs[i];
+    float bestD = 1e9;
+    for (int i = 0; i < 8; i++) {
+      int ix = i < 3 ? i - 1 : i < 5 ? (i == 3 ? -1 : 1) : i - 6;
+      int iy = i < 3 ? -1 : i < 5 ? 0 : 1;
+      ivec2 q = p + ivec2(ix, iy);
       vec4 ink = texelFetch(tInk, q, 0);
       if (ink.a <= 0.0) continue;
       float sceneQ = viewDist(texelFetch(tDepth, q, 0).r);
@@ -89,7 +91,6 @@ void main() {
       if (here < ink.a + 0.04) continue;            // we are in front of the alien
       if (ink.a < bestD) { bestD = ink.a; best = ink; }
     }
-    if (best.a > 0.0) col = best.rgb;
   }
   col = toSRGB(toneMap(col * uExposure));
   float l = dot(col, vec3(0.299, 0.587, 0.114));
@@ -98,6 +99,8 @@ void main() {
   l = clamp(dot(col, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
   vec3 tone = mix(uSplitLo, uSplitHi, smoothstep(0.1, 0.8, l));
   col = mix(col, col * tone / max(dot(tone, vec3(0.299, 0.587, 0.114)), 1e-3), uSplit * (1.0 - abs(l - 0.45)));
+  // ink sits on top of the grade: a crisp, truly dark line in the alien's ink colour
+  if (best.a > 0.0) col = uInkOn > 1.5 ? vec3(1.0, 1.0, 0.0) : toSRGB(best.rgb) * 0.62;
   vec2 cc = vUv - 0.5; float r2 = dot(cc, cc);
   col *= mix(1.0, smoothstep(0.95, 0.15, r2 * 1.6), uVignette);
   col = mix(col, col * vec3(1.25, 0.55, 0.5), uAlarm * smoothstep(0.05, 0.45, r2) );
@@ -192,6 +195,9 @@ export class PixelPost {
     this.r.setRenderTarget(target);
     this.r.render(this.qScene, this.qCam);
   }
+
+  /** debug: count of ink-mask pixels after the last render */
+  debugInk(): number { const w = this.inkRT.width, h = this.inkRT.height; const buf = new Uint16Array(w * h * 4); this.r.readRenderTargetPixels(this.inkRT, 0, 0, w, h, buf); let n = 0; for (let i = 3; i < buf.length; i += 4) if (buf[i] !== 0) n++; return n; }
 
   /** Is the ink pass rendering right now? (alien meshes set their ink colour in onBeforeRender) */
   inking = false;

@@ -91,11 +91,14 @@
 .fp-stats { display: flex; gap: 6px; flex-wrap: wrap; }
 
 @media (max-width: 980px) {
-  .idea { grid-template-columns: 1fr; }
+  .idea { grid-template-columns: minmax(0, 1fr); }
+  .idea-chat-wrap, .idea-board, .chalk { min-width: 0; }
+  .idea-chips .chip { white-space: normal; height: auto; min-height: 26px; padding: 4px 10px; text-align: center; line-height: 1.25; }
   .idea-mobile-switch { display: flex; justify-content: center; padding-bottom: 8px; }
   .idea[data-view='chat'] .idea-board { display: none; }
   .idea[data-view='board'] .idea-chat-wrap { display: none; }
   .glorp-port .voxview { width: 64px !important; height: 64px !important; }
 }
-.idea-chat-wrap { display: flex; min-height: 0; }
+.idea-chat-wrap { display: flex; min-height: 0; min-width: 0; }
 .idea-chat-wrap > .chalk { flex: 1; }
+.idea-welcome .chip { white-space: normal; height: auto; min-height: 26px; max-width: 100%; padding: 4px 10px; line-height: 1.25; text-align: center; }

@@ -125,11 +125,12 @@
 /* ── arcade ──────────────────────────────────────────────────────────────── */
 .arcade-cab { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 24px; background: linear-gradient(180deg, #3b2a8a, #241a5a); box-shadow: inset 0 3px 0 #6f5ad0, 0 8px 0 #120c30, 0 20px 50px #000c; min-height: 0; flex: 1; }
 .arcade-screen { position: relative; flex: 1; min-height: 260px; border-radius: 16px; overflow: hidden; background: #0b0724; box-shadow: inset 0 0 0 3px #000, 0 0 0 3px #ff6fd655; touch-action: none; cursor: crosshair; }
-.arcade-screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.arcade-screen > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 .arcade-hud { position: absolute; left: 12px; right: 12px; top: 10px; display: flex; align-items: center; gap: 10px; pointer-events: none; }
 .arcade-score { font: 400 30px/1 var(--font-logo); color: #fff; text-shadow: 3px 3px 0 #2a1a5a; }
 .arcade-combo { font: 700 16px var(--font-display); color: var(--amber); text-shadow: 2px 2px 0 #5a3a06; animation: pop-in .3s var(--ease-jelly); }
 .arcade-lives { margin-left: auto; display: flex; gap: 2px; }
+.arcade-lives .voxview { flex: none; }
 .arcade-lives .voxview { filter: drop-shadow(2px 2px 0 #0009); transition: filter .3s, opacity .3s; }
 .arcade-lives .voxview.lost { filter: grayscale(1) brightness(.35); opacity: .7; }
 .arcade-overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; text-align: center; background: radial-gradient(ellipse at 50% 45%, #0b072488, #0b0724dd); }

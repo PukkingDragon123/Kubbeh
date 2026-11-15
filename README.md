@@ -4,7 +4,7 @@ A back-alley alien laboratory for Claude. Two pieces, one lab:
 
 | | What it is | Where |
 |---|---|---|
-| **GLOB LABS app** | A full Claude workspace inside a 3D voxel lab: chats, projects, files, artifacts, coding tools, an idea assistant, a fuel tank, Gene Points, a shop and a crew of jelly aliens who act out what Claude is doing. | [`app/`](app) |
+| **GLOB LABS app** | A full Claude workspace aboard a voxel spaceship: chats, projects, files, artifacts, coding tools, an idea assistant, a real fuel tank, Gene Points, a shop and a crew of jelly aliens who act out what Claude is doing. | [`app/`](app) |
 | **GLOB LABS mod** | A Claude Code plugin that reskins Claude Code itself, with a lab pane, a fuel tank fed by your **real subscription usage windows**, and an Auto-Saver that lowers effort and holds back sub-agents as fuel runs low. | [`mod/glob-labs/`](mod/glob-labs) |
 
 ## The app
@@ -35,7 +35,19 @@ Open the printed URL, press **T** for the Terminal, and link an account.
 
 ### What's inside
 
-- **Lab (3D voxel).** Brick alley, pipes, neon, a cloning vat, a giant fuel tank, a GENE-O-MAT vending machine, a wardrobe pod. Click the computer bank for the Terminal, Prof. Glorp for ideas, the tank for fuel. Drag to orbit, scroll to zoom.
+- **The ship (full voxel, pixel-rendered).**
+  - The lab deck is sculpted from high-resolution voxels with painted pixel-art surface textures: riveted hull plates, deck treads, grates, wood, glass.
+  - It renders at a low internal resolution and is scaled up in crisp whole pixels, lit by practical lamps rather than neon.
+  - Through the viewport you see a ringed planet, asteroids and passing UFOs.
+  - On deck are a reactor, cloning pods, a giant glass fuel tank, the GENE-O-MAT and a wardrobe pod.
+  - Click the bridge console for the Terminal, Prof. Glorp for ideas, the tank for fuel. Drag to orbit, scroll to zoom.
+- **The aliens** are built after the reference model:
+  - a big round green head, huge glossy black voxel eyes with highlights, octagonal antenna discs and a tiny body;
+  - 11 expressions sculpted in voxels, 8 skins (including **Snow Pounce**, a snow leopard kitten), and 25 cosmetics.
+- **Interface as objects.**
+  - Four floating voxel buttons (Terminal, Ideas, Shop, and a live bubbling Fuel tank) and almost no text.
+  - Every icon is a photographed voxel model with a pixel finish.
+  - Panels are painted pixel-art hardware with square corners, set in the bundled pixel fonts (CannedPixels, NanoPlus, PixelSans, ChibiMono).
 - **The crew mirrors Claude.** Every streamed event drives an alien:
   - Blip thinks and types.
   - Zib carries files.
@@ -65,4 +77,5 @@ The fuel tank in the mod uses Claude Code's own rate-limit windows (5-hour and w
 ## Credits
 
 - Sound effects are CC0 from OpenGameArt: Kenney's UI SFX and Sci-Fi Sounds, "100 CC0 SFX", and Juhani Junkala's retro collection. Details in [`app/src/assets/sfx/CREDITS.md`](app/src/assets/sfx/CREDITS.md).
-- All voxel models, pixel art and icons are drawn in code for this project.
+- All voxel models, textures, pixel art and icons are generated in code for this project. The pixel render pipeline, the painted-texture approach and the "UI as objects" HUD follow the author's own games, Blobfish (`ubiquitous-happiness`) and Gacha Garage (`didactic-broccoli`).
+- Fonts are from the author's pixel font pack (bundled in `app/src/assets/fonts`).

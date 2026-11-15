@@ -4,7 +4,7 @@
 // beams with lamps, and the big GLOB LABS sign. Everything is voxel.
 import * as THREE from 'three';
 import { M, S } from '../vox/core';
-import { PAL, U, grid, mesh, hazard, instance, at, glowMat } from '../vox/props/kit';
+import { PAL, U, grid, mesh, hazard, instance, at, glowMat, SB } from '../vox/props/kit';
 import { T } from '../vox/tex';
 import {
   floorTile, wallPanel, rib, backLower, windowBay, upperTrim, ceilingBeam, hangingLamp, reactor, airlock, roboticArm,
@@ -53,10 +53,10 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   // front cutaway edge of the deck slab (diorama look) with conduits in the cross-section
   {
     const g = grid([0, -16, -2], [384, 1, 2], 1);
-    g.tex(T.worn).add(S.box([0, -14, -2], [384, 0, 1]), (x, y) => (y > -2 ? hazard(x, y, 3) : y < -13 ? PAL.hullDeep : PAL.hullDark), M.metal);
+    g.tex(T.worn).add(SB([0, -14, -2], [384, 0, 1]), (x, y) => (y > -2 ? hazard(x, y, 3) : y < -13 ? PAL.hullDeep : PAL.hullDark), M.metal);
     g.tex(T.pipe);
     g.tex(T.hull);
-    for (let x = 8; x < 384; x += 32) { g.tex(0).add(S.box([x, -9, 1], [x + 2, -7, 1.6]), 0xffffff, M.glow); g.tex(T.hull); }
+    for (let x = 8; x < 384; x += 32) { g.tex(0).add(SB([x, -9, 1], [x + 2, -7, 1.6]), 0xffffff, M.glow); g.tex(T.hull); }
     for (const [y, c] of [[-4, PAL.paintTeal], [-8.5, PAL.paintRed], [-12, PAL.steel]] as [number, number][]) g.add(S.capsule([0, y, 1.2], [384, y, 1.2], 1.1), c, M.metal);
     const edge = mesh(g, { castShadow: false });
     edge.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = glowMat(PAL.amber, 2.2); } });
@@ -144,9 +144,9 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   {
     // gantry rail cantilevered from the right wall, with a wall bracket and hazard caps
     const rail = grid([0, -4, -3], [104, 4, 3], 1);
-    rail.add(S.box([0, -2, -2], [104, 2, 2]), (x) => (x < 4 ? hazard(x, 0, 2) : Math.floor(x) % 8 < 1 ? PAL.hullDeep : PAL.steelDark), M.metal);
-    rail.add(S.box([96, -4, -3], [104, 4, 3], 0.8), PAL.hullHi, M.metal);
-    for (let x = 8; x < 96; x += 16) rail.add(S.box([x, 2, -1], [x + 2, 3, 1]), 0xffffff, M.glow);
+    rail.add(SB([0, -2, -2], [104, 2, 2]), (x) => (x < 4 ? hazard(x, 0, 2) : Math.floor(x) % 8 < 1 ? PAL.hullDeep : PAL.steelDark), M.metal);
+    rail.add(SB([96, -4, -3], [104, 4, 3], 0.8), PAL.hullHi, M.metal);
+    for (let x = 8; x < 96; x += 16) rail.add(SB([x, 2, -1], [x + 2, 3, 1]), 0xffffff, M.glow);
     const r = mesh(rail, { castShadow: false }); r.position.set(4.2, ROOM.wallH + 0.25, 2.6); r.scale.x = 7.7 / 6.5; group.add(r);
   }
   // painted deck emblem: a jelly alien head in a ring, centre of the room

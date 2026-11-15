@@ -9,7 +9,7 @@ import * as THREE from 'three';
 
 export const T = {
   none: 0, hull: 1, tread: 2, grate: 3, paint: 4, wood: 5, worn: 6, glass: 7, fabric: 8,
-  rubber: 9, console: 10, pipe: 11, rust: 12, crate: 13, tile: 14, vent: 15, plateBig: 16,
+  rubber: 9, console: 10, pipe: 11, rust: 12, crate: 13, tile: 14, vent: 15, plateBig: 16, dense: 17, rough: 18,
 } as const;
 export type TexId = (typeof T)[keyof typeof T];
 
@@ -27,13 +27,13 @@ class Painter {
   hline(x: number, y: number, w: number, c: RGB | number) { this.rect(x, y, w, 1, c); }
   vline(x: number, y: number, h: number, c: RGB | number) { this.rect(x, y, 1, h, c); }
   /** bevelled rectangle: 1 px light top/left, 1 px dark bottom/right, dark gap ring outside */
-  plate(x: number, y: number, w: number, h: number, base = 128, gap = 62, hi = 150, lo = 104) {
+  plate(x: number, y: number, w: number, h: number, base = 128, gap = 44, hi = 166, lo = 92) {
     this.rect(x, y, w, h, gap);
     this.rect(x + 1, y + 1, w - 2, h - 2, base);
     this.hline(x + 1, y + 1, w - 2, hi); this.vline(x + 1, y + 1, h - 2, hi);
     this.hline(x + 1, y + h - 2, w - 2, lo); this.vline(x + w - 2, y + 1, h - 2, lo);
   }
-  rivet(x: number, y: number) { this.set(x, y, 178); this.set(x + 1, y, 132); this.set(x, y + 1, 118); this.set(x + 1, y + 1, 84); }
+  rivet(x: number, y: number) { this.set(x, y, 196); this.set(x + 1, y, 140); this.set(x, y + 1, 112); this.set(x + 1, y + 1, 64); }
   screw(x: number, y: number) { this.rect(x - 1, y - 1, 3, 3, 96); this.set(x, y, 160); this.set(x - 1, y, 120); this.set(x + 1, y, 120); }
   streak(x: number, y: number, len: number, c: RGB, c2: RGB) { for (let i = 0; i < len; i++) this.set(x, y + i, i < len * 0.55 ? c : c2); }
   scratch(x: number, y: number, len: number, dx: number, dy: number, c = 152) { for (let i = 0; i < len; i++) this.set(x + Math.round(i * dx), y + Math.round(i * dy), c); }
@@ -159,6 +159,23 @@ const PAINT: Record<number, (p: Painter) => void> = {
   },
   [T.tile]: (p) => {
     for (let ty = 0; ty < 4; ty++) for (let tx = 0; tx < 4; tx++) p.plate(tx * 16, ty * 16, 16, 16, 128 + ((tx + ty) % 2 ? 6 : -4), 92, 146, 112);
+  },
+  [T.dense]: (p) => {
+    // dense machine panelling: 16 px service plates, alternating tones, screws, hatch lines, a stencil code
+    for (let ty = 0; ty < 4; ty++) for (let tx = 0; tx < 4; tx++) {
+      const b = (tx + ty * 3) % 3 === 0 ? 120 : (tx + ty) % 2 ? 132 : 126;
+      p.plate(tx * 16, ty * 16, 16, 16, b);
+      if ((tx + ty) % 3 === 1) { p.screw(tx * 16 + 3, ty * 16 + 3); p.screw(tx * 16 + 12, ty * 16 + 12); }
+      if ((tx * 5 + ty) % 4 === 2) for (let i = 0; i < 3; i++) { p.hline(tx * 16 + 4, ty * 16 + 5 + i * 3, 8, 70); p.hline(tx * 16 + 4, ty * 16 + 6 + i * 3, 8, 156); }
+    }
+    p.digits(37, 37, '17', 96); p.scratch(6, 50, 9, 1, -0.4, 170);
+  },
+  [T.rough]: (p) => {
+    // painted, handled surface: a few big flat tone zones (hard edges), chips, scuffs, a drip
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) p.set(x, y, ((x >> 4) + (y >> 4) * 3 + ((x * 7 + y * 3) >> 5)) % 4 === 0 ? 120 : 130);
+    for (const [x, y, w, h] of [[8, 6, 5, 2], [40, 14, 3, 3], [22, 40, 6, 2], [52, 50, 4, 2], [4, 58, 3, 2]]) { p.rect(x, y, w, h, 172); p.hline(x, y + h, w, 88); }
+    for (const [x, y, w] of [[14, 24, 10], [36, 54, 12]]) { p.hline(x, y, w, 152); p.hline(x + 1, y + 1, w - 2, 104); }
+    p.streak(46, 30, 9, [112, 108, 104], [120, 118, 116]);
   },
   [T.vent]: (p) => {
     p.plate(0, 0, 64, 64, 120);

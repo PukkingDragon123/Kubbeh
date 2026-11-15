@@ -3,7 +3,7 @@
 // All modules are built facing +z (toward the room) with their origin at bottom-centre.
 import * as THREE from 'three';
 import { M, S, VoxGrid, hash3, mix, shade, fbm } from '../core';
-import { PAL, U, grid, mesh, plate, hazard, grateCell, plateTint, stampText, textWidth, glowMat, GLOW, GLOW_LAMP, occluderPlane } from './kit';
+import { PAL, U, grid, mesh, plate, hazard, grateCell, plateTint, stampText, textWidth, glowMat, GLOW, GLOW_LAMP, occluderPlane, SB } from './kit';
 import { T } from '../tex';
 
 const named = (o: THREE.Object3D, n: string) => { o.name = n; return o; };
@@ -14,10 +14,10 @@ export type TileKind = 'plate' | 'grate' | 'stripe' | 'lightline' | 'hazard';
 export function floorTile(kind: TileKind): THREE.Object3D {
   const g = grid([0, -2, 0], [32, 1, 32], 1);
   const tint = (x: number, z: number) => plateTint(PAL.floor, x, z, 32, 32, 0.035);
-  g.tex(kind === 'hazard' ? T.worn : T.tread).add(S.box([0, -2, 0], [32, 0, 32]), (x, _y, z) => tint(x, z), M.metal);
+  g.tex(kind === 'hazard' ? T.worn : T.tread).add(SB([0, -2, 0], [32, 0, 32]), (x, _y, z) => tint(x, z), M.metal);
   if (kind === 'grate') {
-    g.carve(S.box([4, -1, 4], [28, 0, 28]));
-    g.tex(T.grate).add(S.box([4, -2, 4], [28, -1, 28]), 0x6a747c, M.metal);
+    g.carve(SB([4, -1, 4], [28, 0, 28]));
+    g.tex(T.grate).add(SB([4, -2, 4], [28, -1, 28]), 0x6a747c, M.metal);
     g.tex(0);
     for (let x = 6; x < 26; x += 6) for (let z = 6; z < 26; z += 6) g.set(x, -2, z, 0x2d6a3d, M.glow);     // faint machine glow far below
     g.tex(T.grate);
@@ -27,7 +27,7 @@ export function floorTile(kind: TileKind): THREE.Object3D {
     for (let x = 2; x < 30; x++) for (let z = 26; z < 30; z++) g.set(x, -1, z, hazard(x, z, 3), M.solid);
   }
   if (kind === 'hazard') { g.tex(T.worn); for (let x = 2; x < 30; x++) for (let z = 2; z < 26; z++) g.set(x, -1, z, hazard(x, z, 4), M.solid); }
-  if (kind === 'lightline') { g.tex(0); for (const x of [6, 22]) { g.add(S.box([x, -1, 14], [x + 4, 0.2, 18]), PAL.hullDeep, M.metal); g.add(S.box([x + 1, -1, 15], [x + 3, 0.25, 17]), 0xffffff, M.glow); } }
+  if (kind === 'lightline') { g.tex(0); for (const x of [6, 22]) { g.add(SB([x, -1, 14], [x + 4, 0.2, 18]), PAL.hullDeep, M.metal); g.add(SB([x + 1, -1, 15], [x + 3, 0.25, 17]), 0xffffff, M.glow); } }
   const o = mesh(g, { castShadow: false, occluder: occluderPlane(g, '-y') });
   if (kind === 'lightline') o.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = glowMat(PAL.amber, 1.0); m.name = 'floorGlow'; } });
   return o;
@@ -45,33 +45,33 @@ export function wallPanel(kind: WallKind, seed = 0): THREE.Object3D {
     const p = plate(PAL.hull, x, y - 8, { pw: 16, ph: 28, grime: 26, y: y - 8 });
     return y > 40 && y < 44 ? (x > 1 && x < 31 ? PAL.paintTeal : p) : p;                         // teal waist stripe
   };
-  g.tex(T.hull).add(S.box([0, 0, -8], [32, H, 0]), col, M.metal);
-  g.tex(T.rubber).add(S.box([0, 0, -8], [32, 6, 0.2]), PAL.hullDeep, M.metal);
-  g.tex(T.plateBig).add(S.box([0, 6, 0], [32, 8, 1.4]), shade(PAL.hullDark, 1.1), M.metal);                     // kick ledge
-  g.tex(T.paint).add(S.box([0, 40, 0], [32, 44, 0.8]), PAL.paintTeal, M.metal);
+  g.tex(T.hull).add(SB([0, 0, -8], [32, H, 0]), col, M.metal);
+  g.tex(T.rubber).add(SB([0, 0, -8], [32, 6, 0.2]), PAL.hullDeep, M.metal);
+  g.tex(T.plateBig).add(SB([0, 6, 0], [32, 8, 1.4]), shade(PAL.hullDark, 1.1), M.metal);                     // kick ledge
+  g.tex(T.paint).add(SB([0, 40, 0], [32, 44, 0.8]), PAL.paintTeal, M.metal);
   g.tex(T.plateBig);
   switch (kind) {
     case 'vent':
-      g.carve(S.box([7, 14, -2], [25, 32, 1]));
+      g.carve(SB([7, 14, -2], [25, 32, 1]));
       g.tex(T.vent);
-      for (let y = 15; y < 32; y += 2) g.add(S.box([7, y, -1.5], [25, y + 1, 0.4]), PAL.hullDeep, M.metal);
-      g.add(S.box([6, 13, 0], [26, 14, 1]), PAL.steel, M.metal); g.add(S.box([6, 32, 0], [26, 33, 1]), PAL.steel, M.metal);
+      for (let y = 15; y < 32; y += 2) g.add(SB([7, y, -1.5], [25, y + 1, 0.4]), PAL.hullDeep, M.metal);
+      g.add(SB([6, 13, 0], [26, 14, 1]), PAL.steel, M.metal); g.add(SB([6, 32, 0], [26, 33, 1]), PAL.steel, M.metal);
       break;
     case 'pipes':
       g.tex(T.pipe);
       for (const [x, c, r] of [[6, PAL.paintTeal, 1.8], [11, PAL.steel, 1.3], [15, PAL.paintRed, 1.1]] as [number, number, number][]) {
         g.add(S.capsule([x, 2, 1.6], [x, 98, 1.6], r), (_x, y) => (Math.floor(y) % 20 < 2 ? PAL.chrome : c), M.metal);
-        for (let y = 18; y < 98; y += 24) g.add(S.box([x - r - 0.8, y, -0.4], [x + r + 0.8, y + 1.6, 1.6 + r + 0.6]), PAL.steelDark, M.metal);
+        for (let y = 18; y < 98; y += 24) g.add(SB([x - r - 0.8, y, -0.4], [x + r + 0.8, y + 1.6, 1.6 + r + 0.6]), PAL.steelDark, M.metal);
       }
       g.add(S.disc([22, 60, 2.2], [0, 0, 1], 3.2, 0.8, 8), PAL.paintRed, M.metal);             // valve wheel
-      g.add(S.box([20, 26, 0], [28, 36, 1.6], 0.4), PAL.hullDark, M.metal);                     // gauge box
+      g.add(SB([20, 26, 0], [28, 36, 1.6], 0.4), PAL.hullDark, M.metal);                     // gauge box
       g.add(S.disc([24, 31, 1.8], [0, 0, 1], 2.6, 0.3), 0xf4f0e0, M.solid);
       g.add(S.capsule([24, 31, 2.2], [25.6, 32.6, 2.2], 0.3), PAL.red, M.solid);
       break;
     case 'screen':
-      g.tex(T.console).add(S.box([5, 50, 0], [27, 68, 1.6], 0.6), PAL.hullDeep, M.metal);
+      g.tex(T.console).add(SB([5, 50, 0], [27, 68, 1.6], 0.6), PAL.hullDeep, M.metal);
       g.tex(0);
-      g.add(S.box([6.5, 51.5, 1.5], [25.5, 66.5, 1.9]), (x, y) => {
+      g.add(SB([6.5, 51.5, 1.5], [25.5, 66.5, 1.9]), (x, y) => {
         // scan-line chart: rising bars
         const bar = Math.floor((x - 6.5) / 2.4);
         const hgt = 4 + ((hash3(bar, seed, 1) * 9) | 0);
@@ -87,13 +87,13 @@ export function wallPanel(kind: WallKind, seed = 0): THREE.Object3D {
     case 'locker':
       g.tex(T.paint);
       for (const x0 of [2, 17]) {
-        g.add(S.box([x0, 10, 0], [x0 + 13, 38, 1.2], 0.3), (x, y) => (y > 33 && y < 36 && (x - x0) % 2 < 1 ? PAL.hullDeep : x0 === 2 ? 0x4a6a8a : 0x6a4a8a), M.metal);
-        g.add(S.box([x0 + 10, 20, 1.2], [x0 + 11, 26, 2]), PAL.chrome, M.metal);
+        g.add(SB([x0, 10, 0], [x0 + 13, 38, 1.2], 0.3), (x, y) => (y > 33 && y < 36 && (x - x0) % 2 < 1 ? PAL.hullDeep : x0 === 2 ? 0x4a6a8a : 0x6a4a8a), M.metal);
+        g.add(SB([x0 + 10, 20, 1.2], [x0 + 11, 26, 2]), PAL.chrome, M.metal);
       }
       break;
     case 'sign': {
-      g.tex(T.worn).add(S.box([3, 54, 0], [29, 64, 1.2]), PAL.hazardY, M.solid);
-      g.add(S.box([4, 55, 1.2], [28, 63, 1.4]), PAL.hazardK, M.solid);
+      g.tex(T.worn).add(SB([3, 54, 0], [29, 64, 1.2]), PAL.hazardY, M.solid);
+      g.add(SB([4, 55, 1.2], [28, 63, 1.4]), PAL.hazardK, M.solid);
       stampText(g, 'DECK', 6, 61.5, 1.4, 1, PAL.hazardY, M.solid, 0.6);
       stampText(g, '7', 21, 61.5, 1.4, 1, PAL.hazardY, M.solid, 0.6);
       break;
@@ -105,12 +105,12 @@ export function wallPanel(kind: WallKind, seed = 0): THREE.Object3D {
 /** Structural rib between wall panels: 6 wide, 102 tall, protrudes 5. */
 export function rib(): THREE.Object3D {
   const g = grid([-3, 0, -2], [3, 104, 5], 1);
-  g.tex(T.plateBig).add(S.box([-3, 0, -2], [3, 102, 4], 1), (x, y) => {
+  g.tex(T.plateBig).add(SB([-3, 0, -2], [3, 102, 4], 1), (x, y) => {
     if (y % 24 < 1.2) return shade(PAL.hullDark, 0.7);
     if (Math.abs(x) < 1 && y % 24 > 10 && y % 24 < 12) return PAL.chrome;
     return x < -1.5 ? shade(PAL.hullHi, 0.95) : PAL.hullHi;
   }, M.metal);
-  g.tex(0).add(S.box([-1, 70, 4], [1, 72, 5]), 0xffffff, M.glow);   // tiny rib indicator LED
+  g.tex(0).add(SB([-1, 70, 4], [1, 72, 5]), 0xffffff, M.glow);   // tiny rib indicator LED
   const o = mesh(g, { castShadow: false });
   o.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = glowMat(0x7fd8ff, 1.8); m.name = 'ribLight'; } });
   return o;
@@ -119,11 +119,11 @@ export function rib(): THREE.Object3D {
 /** Back wall below the window: 32 wide × 36 tall. */
 export function backLower(kind: 'plain' | 'vent' | 'conduit'): THREE.Object3D {
   const g = grid([0, 0, -8], [32, 36, 2], 1);
-  g.tex(T.hull).add(S.box([0, 0, -8], [32, 36, 0]), (x, y) => (y < 7 ? PAL.hullDark : plate(PAL.hull, x, y - 7, { pw: 16, ph: 29, grime: 20, y: y - 7 })), M.metal);
-  g.tex(T.rubber).add(S.box([0, 0, -8], [32, 6, 0.2]), PAL.hullDeep, M.metal);
-  if (kind === 'vent') { g.tex(T.vent); for (let y = 12; y < 26; y += 2) g.add(S.box([8, y, 0], [24, y + 1, 1]), PAL.hullDeep, M.metal); }
+  g.tex(T.hull).add(SB([0, 0, -8], [32, 36, 0]), (x, y) => (y < 7 ? PAL.hullDark : plate(PAL.hull, x, y - 7, { pw: 16, ph: 29, grime: 20, y: y - 7 })), M.metal);
+  g.tex(T.rubber).add(SB([0, 0, -8], [32, 6, 0.2]), PAL.hullDeep, M.metal);
+  if (kind === 'vent') { g.tex(T.vent); for (let y = 12; y < 26; y += 2) g.add(SB([8, y, 0], [24, y + 1, 1]), PAL.hullDeep, M.metal); }
   if (kind === 'conduit') { g.tex(T.pipe); g.add(S.capsule([0, 30, 1], [32, 30, 1], 1.4), PAL.paintTeal, M.metal); g.add(S.capsule([0, 26, 1], [32, 26, 1], 1), PAL.steel, M.metal); }
-  g.tex(T.plateBig).add(S.box([0, 34, 0], [32, 36, 1.4]), PAL.hullHi, M.metal);
+  g.tex(T.plateBig).add(SB([0, 34, 0], [32, 36, 1.4]), PAL.hullHi, M.metal);
   return mesh(g, { castShadow: false, occluder: occluderPlane(g, '-z') });
 }
 
@@ -136,12 +136,12 @@ export function windowBay(): THREE.Object3D {
     if (e < 2.5) return PAL.hullHi;
     return plate(PAL.hull, x, y, { pw: 64, ph: 52 });
   };
-  g.tex(T.plateBig).add(S.box([0, 0, -6], [64, 52, 2]), frame, M.metal);
-  g.carve(S.box([5, 5, -7], [59, 47, 3]));
+  g.tex(T.plateBig).add(SB([0, 0, -6], [64, 52, 2]), frame, M.metal);
+  g.carve(SB([5, 5, -7], [59, 47, 3]));
   // chamfered inner lip
-  for (let i = 0; i < 3; i++) g.add(S.box([5 - i, 5 - i, 2 - i], [59 + i, 47 + i, 3 - i]), shade(PAL.steel, 1 - i * 0.08), M.metal);
-  g.carve(S.box([5, 5, -7], [59, 47, 3]));
-  g.add(S.box([30.5, 5, -2], [33.5, 47, 2.6]), PAL.hullHi, M.metal);   // mullion
+  for (let i = 0; i < 3; i++) g.add(SB([5 - i, 5 - i, 2 - i], [59 + i, 47 + i, 3 - i]), shade(PAL.steel, 1 - i * 0.08), M.metal);
+  g.carve(SB([5, 5, -7], [59, 47, 3]));
+  g.add(SB([30.5, 5, -2], [33.5, 47, 2.6]), PAL.hullHi, M.metal);   // mullion
   for (let i = 0; i < 10; i++) { g.add(S.sphere([3, 5 + i * 4.6, 2.4], 0.7), PAL.chrome, M.metal); g.add(S.sphere([61, 5 + i * 4.6, 2.4], 0.7), PAL.chrome, M.metal); }
   for (let i = 0; i < 14; i++) { g.add(S.sphere([5 + i * 4.1, 2.6, 2.4], 0.7), PAL.chrome, M.metal); g.add(S.sphere([5 + i * 4.1, 49.4, 2.4], 0.7), PAL.chrome, M.metal); }
   return mesh(g, { castShadow: false, occluder: occluderPlane(g, '-z') });
@@ -150,14 +150,14 @@ export function windowBay(): THREE.Object3D {
 /** Upper back trim with a cable tray and light bar: 32 wide × 20 tall. */
 export function upperTrim(): THREE.Object3D {
   const g = grid([0, 0, -8], [32, 20, 6], 1);
-  g.tex(T.hull).add(S.box([0, 0, -8], [32, 20, 0]), (x, y) => plate(shade(PAL.hull, 0.85), x, y, { pw: 16, ph: 20 }), M.metal);
-  g.tex(T.plateBig).add(S.box([0, 4, 0], [32, 6, 5]), PAL.steelDark, M.metal);                       // tray
-  for (let x = 1; x < 32; x += 4) g.add(S.box([x, 6, 0.5], [x + 0.8, 9, 5]), PAL.steelDark, M.metal);
+  g.tex(T.hull).add(SB([0, 0, -8], [32, 20, 0]), (x, y) => plate(shade(PAL.hull, 0.85), x, y, { pw: 16, ph: 20 }), M.metal);
+  g.tex(T.plateBig).add(SB([0, 4, 0], [32, 6, 5]), PAL.steelDark, M.metal);                       // tray
+  for (let x = 1; x < 32; x += 4) g.add(SB([x, 6, 0.5], [x + 0.8, 9, 5]), PAL.steelDark, M.metal);
   for (const [z, c] of [[1.6, PAL.cable], [2.8, PAL.paintRed], [4, PAL.cable]] as [number, number][]) g.add(S.capsule([0, 7, z], [32, 7.4, z], 0.6), c, M.solid);
   // a caged work light per module: metal hood, small warm bulb (a real light source)
-  g.tex(T.paint).add(S.box([12, 12, 0], [20, 17, 2.6], 0.5), PAL.paintTealDark, M.metal);
-  g.tex(0).add(S.box([13.5, 12.4, 2.2], [18.5, 14, 3]), 0xfff0d0, M.glow);
-  for (let x = 13; x < 20; x += 2) g.add(S.box([x, 11.6, 2.6], [x + 0.6, 14.4, 3.2]), PAL.hullDeep, M.metal);
+  g.tex(T.paint).add(SB([12, 12, 0], [20, 17, 2.6], 0.5), PAL.paintTealDark, M.metal);
+  g.tex(0).add(SB([13.5, 12.4, 2.2], [18.5, 14, 3]), 0xfff0d0, M.glow);
+  for (let x = 13; x < 20; x += 2) g.add(SB([x, 11.6, 2.6], [x + 0.6, 14.4, 3.2]), PAL.hullDeep, M.metal);
   const o = mesh(g, { castShadow: false, occluder: occluderPlane(g, '-z'), override: { [M.glow]: GLOW_LAMP } });
   return o;
 }
@@ -166,8 +166,8 @@ export function upperTrim(): THREE.Object3D {
 export function ceilingBeam(len: number): THREE.Object3D {
   const L = Math.round(len * 16);
   const g = grid([0, -4, -4], [L, 4, 4], 1);
-  g.tex(T.plateBig).add(S.box([0, -3, -3], [L, 3, 3], 0.6), (x, y) => (Math.floor(x) % 32 < 1 ? PAL.hullDeep : y > 2 ? PAL.hullHi : PAL.hull), M.metal);
-  for (let x = 4; x < L; x += 8) { g.add(S.box([x, -3.6, -3.6], [x + 1, 3.6, 3.6]), PAL.steelDark, M.metal); }
+  g.tex(T.plateBig).add(SB([0, -3, -3], [L, 3, 3], 0.6), (x, y) => (Math.floor(x) % 32 < 1 ? PAL.hullDeep : y > 2 ? PAL.hullHi : PAL.hull), M.metal);
+  for (let x = 4; x < L; x += 8) { g.add(SB([x, -3.6, -3.6], [x + 1, 3.6, 3.6]), PAL.steelDark, M.metal); }
   return mesh(g, { castShadow: false });
 }
 
@@ -190,11 +190,11 @@ export function reactor(): THREE.Object3D {
   g.tex(T.hull).add(S.cyl(0, 0, 14, 0, 10), (x, y, z) => (y > 8 ? PAL.hullHi : plate(PAL.hullDark, Math.atan2(z, x) * 10, y, { pw: 6, ph: 10 })), M.metal);
   g.add(S.cyl(0, 0, 14, 90, 102), (x, y, z) => (y < 92 ? PAL.hullHi : plate(PAL.hullDark, Math.atan2(z, x) * 10, y, { pw: 6, ph: 12 })), M.metal);
   g.tex(T.pipe);
-  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; g.add(S.box([Math.cos(a) * 10 - 1, 10, Math.sin(a) * 10 - 1], [Math.cos(a) * 10 + 1, 90, Math.sin(a) * 10 + 1]), PAL.steel, M.metal); }
+  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; g.add(SB([Math.cos(a) * 10 - 1, 10, Math.sin(a) * 10 - 1], [Math.cos(a) * 10 + 1, 90, Math.sin(a) * 10 + 1]), PAL.steel, M.metal); }
   g.tex(T.glass).add(S.cyl(0, 0, 9, 10, 90), PAL.glass, M.glass);
   g.tex(0);
   stampText(g, 'CORE', -textWidth('CORE', 1.2) / 2, 100, 14.2, 1.2, PAL.hazardY, M.solid, 0.6);
-  for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + 0.4; g.add(S.box([Math.cos(a) * 14 - 0.6, 6, Math.sin(a) * 14 - 0.6], [Math.cos(a) * 14 + 0.6, 7.4, Math.sin(a) * 14 + 0.6]), 0xffffff, M.glow); }
+  for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + 0.4; g.add(SB([Math.cos(a) * 14 - 0.6, 6, Math.sin(a) * 14 - 0.6], [Math.cos(a) * 14 + 0.6, 7.4, Math.sin(a) * 14 + 0.6]), 0xffffff, M.glow); }
   root.add(mesh(g, { castShadow: false }));
   const c = grid([-6, 10, -6], [6, 90, 6], 1);
   c.add(S.cyl(0, 0, 4.6, 12, 88), (x, y, z) => (Math.sin(y * 0.4 + Math.atan2(z, x) * 2) > 0.4 ? 0xffffff : 0x9fffc0), M.glow);
@@ -207,7 +207,7 @@ export function reactor(): THREE.Object3D {
     const r = grid([-12, -2, -12], [12, 2, 12], 1);
     r.tex(T.pipe).add(S.torus([0, 0, 0], [0, 1, 0], 10.4, 1.4), PAL.steel, M.metal);
     r.tex(0);
-    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; r.add(S.box([Math.cos(a) * 11.4 - 0.5, -0.5, Math.sin(a) * 11.4 - 0.5], [Math.cos(a) * 11.4 + 0.5, 0.5, Math.sin(a) * 11.4 + 0.5]), 0xffffff, M.glow); }
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2; r.add(SB([Math.cos(a) * 11.4 - 0.5, -0.5, Math.sin(a) * 11.4 - 0.5], [Math.cos(a) * 11.4 + 0.5, 0.5, Math.sin(a) * 11.4 + 0.5]), 0xffffff, M.glow); }
     const m = mesh(r, { castShadow: false, override: { [M.glow]: GLOW_LAMP } });
     m.position.y = (24 + i * 24) * U;
     rings.add(m);
@@ -220,12 +220,12 @@ export function reactor(): THREE.Object3D {
 export function airlock(): THREE.Object3D {
   const root = new THREE.Group();
   const g = grid([-24, 0, -8], [24, 64, 6], 1);
-  g.tex(T.hull).add(S.box([-24, 0, -8], [24, 64, 0]), (x, y) => plate(PAL.hullDark, x + 24, y, { pw: 16, ph: 32 }), M.metal);
+  g.tex(T.hull).add(SB([-24, 0, -8], [24, 64, 0]), (x, y) => plate(PAL.hullDark, x + 24, y, { pw: 16, ph: 32 }), M.metal);
   g.tex(T.worn).add(S.disc([0, 30, 1], [0, 0, 1], 22, 2.4, 0), (x, y) => { const r = Math.hypot(x, y - 30), a = Math.atan2(y - 30, x); return r > 19 ? (Math.floor(a * 10 / Math.PI) % 2 ? PAL.hazardY : PAL.hazardK) : PAL.hull; }, M.metal);
   g.tex(T.plateBig).add(S.disc([0, 30, 3], [0, 0, 1], 17, 1.2, 0), (x, y) => (Math.abs(x) < 0.8 ? PAL.hullDeep : plate(PAL.steel, x + 17, y, { pw: 34, ph: 34 })), M.metal);
   g.tex(0);
   for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; g.add(S.sphere([Math.cos(a) * 20.6, 30 + Math.sin(a) * 20.6, 3.6], 0.9), PAL.chrome, M.metal); }
-  g.add(S.box([16, 52, 0], [22, 58, 1.6], 0.4), PAL.hullDeep, M.metal);
+  g.add(SB([16, 52, 0], [22, 58, 1.6], 0.4), PAL.hullDeep, M.metal);
   g.add(S.sphere([19, 55, 2], 1.6), 0xffffff, M.glow);
   stampText(g, 'AIRLOCK', -textWidth('AIRLOCK', 0.9) / 2, 61.5, 0.2, 0.9, PAL.hazardY, M.solid, 0.8);
   const base = mesh(g, { castShadow: false });
@@ -247,13 +247,13 @@ export function roboticArm(): THREE.Object3D {
   const base = named(new THREE.Group(), 'base');
   base.add(mk((g) => { g.add(S.cyl(0, 0, 6, -4, 0), PAL.hullDark, M.metal); g.add(S.cyl(0, 0, 4, -8, -4), PAL.steel, M.metal); }, [-7, -9, -7], [7, 1, 7]));
   const upper = named(new THREE.Group(), 'upper'); upper.position.y = -8 * U; base.add(upper);
-  upper.add(mk((g) => { g.add(S.sphere([0, 0, 0], 3.4), PAL.steelDark, M.metal); g.add(S.box([-2.4, -26, -2.4], [2.4, 0, 2.4], 1), paint, M.metal); g.add(S.capsule([3, -2, 0], [3, -24, 0], 0.6), PAL.cable, M.solid); }, [-5, -28, -5], [5, 4, 5]));
+  upper.add(mk((g) => { g.add(S.sphere([0, 0, 0], 3.4), PAL.steelDark, M.metal); g.add(SB([-2.4, -26, -2.4], [2.4, 0, 2.4], 1), paint, M.metal); g.add(S.capsule([3, -2, 0], [3, -24, 0], 0.6), PAL.cable, M.solid); }, [-5, -28, -5], [5, 4, 5]));
   const lower = named(new THREE.Group(), 'lower'); lower.position.y = -26 * U; upper.add(lower);
-  lower.add(mk((g) => { g.add(S.sphere([0, 0, 0], 3), PAL.steelDark, M.metal); g.add(S.box([-2, -20, -2], [2, 0, 2], 0.8), paint, M.metal); }, [-4, -22, -4], [4, 4, 4]));
+  lower.add(mk((g) => { g.add(S.sphere([0, 0, 0], 3), PAL.steelDark, M.metal); g.add(SB([-2, -20, -2], [2, 0, 2], 0.8), paint, M.metal); }, [-4, -22, -4], [4, 4, 4]));
   const hand = named(new THREE.Group(), 'hand'); hand.position.y = -20 * U; lower.add(hand);
   hand.add(mk((g) => {
     g.add(S.cyl(0, 0, 2.6, -2, 0), PAL.steel, M.metal);
-    for (const sx of [-1, 1]) { g.add(S.box([sx * 2 - 0.7, -7, -1], [sx * 2 + 0.7, -2, 1]), PAL.chrome, M.metal); g.add(S.box([sx * 1.2 - 0.6, -8, -1], [sx * 1.2 + 0.6, -6.4, 1]), PAL.chrome, M.metal); }
+    for (const sx of [-1, 1]) { g.add(SB([sx * 2 - 0.7, -7, -1], [sx * 2 + 0.7, -2, 1]), PAL.chrome, M.metal); g.add(SB([sx * 1.2 - 0.6, -8, -1], [sx * 1.2 + 0.6, -6.4, 1]), PAL.chrome, M.metal); }
     g.add(S.sphere([0, -1, 2.4], 0.8), 0xffffff, M.glow);
   }, [-4, -9, -3], [4, 1, 4]));
   return base;
@@ -263,11 +263,11 @@ export function roboticArm(): THREE.Object3D {
 export function hydroponics(): THREE.Object3D {
   const g = grid([-24, 0, -2], [24, 72, 14], 1);
   g.tex(T.plateBig);
-  for (const sx of [-1, 1]) g.add(S.box([sx * 23 - 1, 0, 0], [sx * 23 + 1, 70, 12]), PAL.steelDark, M.metal);
+  for (const sx of [-1, 1]) g.add(SB([sx * 23 - 1, 0, 0], [sx * 23 + 1, 70, 12]), PAL.steelDark, M.metal);
   for (const y of [4, 26, 48]) {
-    g.tex(T.paint).add(S.box([-22, y, 1], [22, y + 6, 12], 0.6), (x, yy) => (yy > y + 4.6 ? 0x3b2a1e : PAL.paintTeal), M.metal);
-    g.tex(T.plateBig).add(S.box([-22, y + 20, 1], [22, y + 21.4, 11]), PAL.steelDark, M.metal);
-    g.tex(0).add(S.box([-20, y + 19, 3], [20, y + 20, 9]), 0xffffff, M.glow);                         // grow light tube
+    g.tex(T.paint).add(SB([-22, y, 1], [22, y + 6, 12], 0.6), (x, yy) => (yy > y + 4.6 ? 0x3b2a1e : PAL.paintTeal), M.metal);
+    g.tex(T.plateBig).add(SB([-22, y + 20, 1], [22, y + 21.4, 11]), PAL.steelDark, M.metal);
+    g.tex(0).add(SB([-20, y + 19, 3], [20, y + 20, 9]), 0xffffff, M.glow);                         // grow light tube
     g.tex(0);
     for (let i = 0; i < 9; i++) {
       const x = -19 + i * 4.8, h = 6 + ((hash3(i, y, 1) * 9) | 0);
@@ -290,8 +290,8 @@ export function bigSign(): THREE.Object3D {
   const s = 2.2;
   const w = textWidth('GLOB LABS', s);
   const g = grid([-w / 2 - 6, -3, -2], [w / 2 + 6, 22, 6], 1);
-  g.tex(T.plateBig).add(S.box([-w / 2 - 4, -2, -2], [w / 2 + 4, 14, 0], 1), (x) => plate(PAL.hullDark, x + w / 2, 0, { pw: 16, ph: 16 }), M.metal);
-  g.tex(T.paint).add(S.box([-w / 2 - 4.6, -2.6, -1.6], [w / 2 + 4.6, -1.4, 0.8]), PAL.hazardY, M.metal);
+  g.tex(T.plateBig).add(SB([-w / 2 - 4, -2, -2], [w / 2 + 4, 14, 0], 1), (x) => plate(PAL.hullDark, x + w / 2, 0, { pw: 16, ph: 16 }), M.metal);
+  g.tex(T.paint).add(SB([-w / 2 - 4.6, -2.6, -1.6], [w / 2 + 4.6, -1.4, 0.8]), PAL.hazardY, M.metal);
   g.tex(T.worn);
   const split = -w / 2 + textWidth('GLOB ', s);
   stampText(g, 'GLOB', -w / 2, 11.5, 0, s, 0x9be36a, M.solid, 1.6);
@@ -299,9 +299,9 @@ export function bigSign(): THREE.Object3D {
   // drop-shadow edge on letters (paint, one voxel darker below-right)
   g.tex(0);
   for (const lx of [-w / 2 + 6, w / 2 - 6]) {
-    g.tex(T.paint).add(S.box([lx - 0.8, 14, -1], [lx + 0.8, 19, 1]), PAL.steelDark, M.metal);           // lamp arm
-    g.add(S.box([lx - 3.4, 17, -0.5], [lx + 3.4, 19.6, 4.6], 0.6), PAL.paintTealDark, M.metal);         // hood
-    g.tex(0).add(S.box([lx - 2.2, 16.6, 1], [lx + 2.2, 17.4, 3.8]), 0xfff0d0, M.glow);                  // bulb
+    g.tex(T.paint).add(SB([lx - 0.8, 14, -1], [lx + 0.8, 19, 1]), PAL.steelDark, M.metal);           // lamp arm
+    g.add(SB([lx - 3.4, 17, -0.5], [lx + 3.4, 19.6, 4.6], 0.6), PAL.paintTealDark, M.metal);         // hood
+    g.tex(0).add(SB([lx - 2.2, 16.6, 1], [lx + 2.2, 17.4, 3.8]), 0xfff0d0, M.glow);                  // bulb
   }
   return mesh(g, { castShadow: false, override: { [M.glow]: GLOW_LAMP } });
 }

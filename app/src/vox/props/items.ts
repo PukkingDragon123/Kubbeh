@@ -8,7 +8,7 @@
 // leds, bulbs, blobs, ring, tentacleN, brain…) so the world can animate them.
 import * as THREE from 'three';
 import { M, S, VoxGrid, mix, shade, smoothUnion, hash3, type V3 } from '../core';
-import { PAL, U, grid, mesh, plate, hazard, stampText, textWidth, glowMat, vgrad } from './kit';
+import { PAL, U, grid, mesh, plate, hazard, stampText, textWidth, glowMat, vgrad, SB } from './kit';
 import { T } from '../tex';
 
 export interface ItemMeta {
@@ -87,7 +87,7 @@ function beanbag() {
   g.add(smoothUnion(S.ellipsoid([0, 4, 0], [7, 4.2, 7]), S.ellipsoid([0, 7, -3.2], [5.2, 3.6, 3]), 2.5), col, M.jelly);
   g.carve(S.ellipsoid([0, 8.6, 1.4], [4.2, 2.8, 4]));
   g.add(S.ellipsoid([0, 5.6, 1.4], [3.6, 0.6, 3.4]), 0x5fd84a, M.jelly);
-  g.paint(S.box([3, 3, 5.8], [5, 5, 7.2]), PAL.pink, M.solid); // patch
+  g.paint(SB([3, 3, 5.8], [5, 5, 7.2]), PAL.pink, M.solid); // patch
   return mesh(g);
 }
 
@@ -98,13 +98,13 @@ function couch() {
     const quilt = (Math.floor(x / 3) + Math.floor(y / 3)) % 2 === 0;
     return quilt ? 0x7a2f5a : 0x8a3866;
   };
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(S.box([sx * 13 - 1, 0, sz * 5 - 1], [sx * 13 + 1, 3, sz * 5 + 1]), PAL.chrome, M.metal);
-  g.add(S.box([-15, 3, -7], [15, 7, 7], 1.5), fabric, M.fur);                    // base
-  g.add(S.box([-15, 7, -7], [15, 17, -3], 2), fabric, M.fur);                     // back
-  g.add(S.box([-15.5, 3, -7], [-11.5, 12, 7], 1.8), fabric, M.fur);               // arms
-  g.add(S.box([11.5, 3, -7], [15.5, 12, 7], 1.8), fabric, M.fur);
-  for (const cx of [-5.6, 5.6]) g.add(S.box([cx - 5.4, 7, -3.4], [cx + 5.4, 10, 6.6], 1.4), (x, y) => (y > 9.3 ? 0xa04878 : 0x92406c), M.fur);
-  g.paint(S.box([7, 7.5, 6], [10, 9.5, 7]), 0x3fb84a, M.jelly);                    // slime stain
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(SB([sx * 13 - 1, 0, sz * 5 - 1], [sx * 13 + 1, 3, sz * 5 + 1]), PAL.chrome, M.metal);
+  g.add(SB([-15, 3, -7], [15, 7, 7], 1.5), fabric, M.fur);                    // base
+  g.add(SB([-15, 7, -7], [15, 17, -3], 2), fabric, M.fur);                     // back
+  g.add(SB([-15.5, 3, -7], [-11.5, 12, 7], 1.8), fabric, M.fur);               // arms
+  g.add(SB([11.5, 3, -7], [15.5, 12, 7], 1.8), fabric, M.fur);
+  for (const cx of [-5.6, 5.6]) g.add(SB([cx - 5.4, 7, -3.4], [cx + 5.4, 10, 6.6], 1.4), (x, y) => (y > 9.3 ? 0xa04878 : 0x92406c), M.fur);
+  g.paint(SB([7, 7.5, 6], [10, 9.5, 7]), 0x3fb84a, M.jelly);                    // slime stain
   for (let i = 0; i < 4; i++) g.set(Math.floor((-9 + i) * 2), Math.floor(14 * 2), Math.floor(-2.8 * 2), 0xf0e6c8, M.solid); // stitches
   return mesh(g);
 }
@@ -112,23 +112,23 @@ function couch() {
 function workbench() {
   const g = grid([-16, 0, -8], [16, 28, 8], 2);
   g.tex(T.wood);
-  g.add(S.box([-15, 11, -7], [15, 13, 7]), (x, y, z) => plate(PAL.wood, x + 16, z + 8, { pw: 6, ph: 30, bolt: false }), M.solid);
-  for (const sx of [-1, 1]) g.add(S.box([sx * 13 - 1.2, 0, -6], [sx * 13 + 1.2, 11, 6]), PAL.steelDark, M.metal);
-  g.add(S.box([-13, 3, -6], [13, 4, 6]), PAL.steelDark, M.metal);
-  g.add(S.box([-15, 13, -8], [15, 27, -6.6]), (x, y) => ((Math.floor(x) + Math.floor(y)) % 2 === 0 && (x * 2) % 2 < 1 ? shade(PAL.paintCream, 0.85) : PAL.paintCream), M.solid);
+  g.add(SB([-15, 11, -7], [15, 13, 7]), (x, y, z) => plate(PAL.wood, x + 16, z + 8, { pw: 6, ph: 30, bolt: false }), M.solid);
+  for (const sx of [-1, 1]) g.add(SB([sx * 13 - 1.2, 0, -6], [sx * 13 + 1.2, 11, 6]), PAL.steelDark, M.metal);
+  g.add(SB([-13, 3, -6], [13, 4, 6]), PAL.steelDark, M.metal);
+  g.add(SB([-15, 13, -8], [15, 27, -6.6]), (x, y) => ((Math.floor(x) + Math.floor(y)) % 2 === 0 && (x * 2) % 2 < 1 ? shade(PAL.paintCream, 0.85) : PAL.paintCream), M.solid);
   for (let i = 0; i < 5; i++) g.add(S.capsule([-11 + i * 5, 17, -6.4], [-11 + i * 5, 23, -6.4], 0.7), [PAL.paintRed, PAL.steel, PAL.amber, PAL.cyan, PAL.steel][i], M.metal);
-  g.add(S.box([8, 13, -2], [13, 17, 2]), PAL.paintTeal, M.metal);                 // vise
+  g.add(SB([8, 13, -2], [13, 17, 2]), PAL.paintTeal, M.metal);                 // vise
   g.add(S.capsule([10.5, 15, 2], [10.5, 15, 5], 0.6), PAL.chrome, M.metal);
-  g.add(S.box([-6, 13, 1], [-1, 14, 5]), 0x2a2f34, M.solid);                       // tablet
-  g.add(S.box([-5.5, 14, 1.5], [-1.5, 14.4, 4.5]), 0x52f2ff, M.glow);
+  g.add(SB([-6, 13, 1], [-1, 14, 5]), 0x2a2f34, M.solid);                       // tablet
+  g.add(SB([-5.5, 14, 1.5], [-1.5, 14.4, 4.5]), 0x52f2ff, M.glow);
   return mesh(g);
 }
 
 function shelf() {
   const g = grid([-8, 0, -8], [8, 34, 8], 2);
   g.tex(T.hull);
-  for (const sx of [-1, 1]) g.add(S.box([sx * 7 - 0.8, 0, -6], [sx * 7 + 0.8, 33, -1]), PAL.steelDark, M.metal);
-  for (const y of [1, 11, 21, 31]) g.add(S.box([-7, y, -6], [7, y + 1.2, -1]), PAL.steel, M.metal);
+  for (const sx of [-1, 1]) g.add(SB([sx * 7 - 0.8, 0, -6], [sx * 7 + 0.8, 33, -1]), PAL.steelDark, M.metal);
+  for (const y of [1, 11, 21, 31]) g.add(SB([-7, y, -6], [7, y + 1.2, -1]), PAL.steel, M.metal);
   const jar = (x: number, y: number, liquid: number, thing: number) => {
     g.add(S.cyl(x, -3.5, 2, y, y + 6), PAL.glass, M.glass);
     g.add(S.cyl(x, -3.5, 1.6, y, y + 4), liquid, M.glow);
@@ -137,7 +137,7 @@ function shelf() {
   };
   jar(-4, 2.2, 0x3fa84a, PAL.pink); jar(0.5, 2.2, 0x2f7fa8, 0xffe14d); jar(4.5, 2.2, 0x8a3fa8, PAL.glob);
   jar(-3, 12.2, 0xa8743f, 0xffffff);
-  g.add(S.box([1, 12.2, -5], [6, 16, -2]), 0x8a5a33, M.solid);                      // crate
+  g.add(SB([1, 12.2, -5], [6, 16, -2]), 0x8a5a33, M.solid);                      // crate
   g.add(S.capsule([-5, 23, -3], [-2, 23.4, -3], 1.2), 0xf0e6c8, M.fur);             // the sock
   g.add(S.ellipsoid([3, 23.5, -3.5], [2.6, 1.6, 2]), PAL.steel, M.metal);           // bolts pile
   return mesh(g);
@@ -168,15 +168,15 @@ function stool() {
 
 // ── decor ────────────────────────────────────────────────────────────────────
 function signStand(g: VoxGrid, h = 26) {
-  g.add(S.box([-6, 0, -4], [6, 1.6, 4], 0.4), PAL.hullDark, M.metal);
-  g.add(S.box([-0.8, 1.6, -0.8], [0.8, h, 0.8]), PAL.steelDark, M.metal);
+  g.add(SB([-6, 0, -4], [6, 1.6, 4], 0.4), PAL.hullDark, M.metal);
+  g.add(SB([-0.8, 1.6, -0.8], [0.8, h, 0.8]), PAL.steelDark, M.metal);
 }
 function neonHeart() {
   const root = new THREE.Group();
   const g = grid([-9, 0, -5], [9, 34, 5], 3);
   g.tex(T.hull);
   signStand(g, 18);
-  g.add(S.box([-8.5, 17, -1.4], [8.5, 33, -0.4], 0.6), 0x1a1220, M.solid);       // backboard
+  g.add(SB([-8.5, 17, -1.4], [8.5, 33, -0.4], 0.6), 0x1a1220, M.solid);       // backboard
   for (let i = 0; i < 64; i++) {
     const t = (i / 64) * Math.PI * 2;
     const x = 16 * Math.pow(Math.sin(t), 3) / 2.3, y = (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / 2.3;
@@ -197,7 +197,7 @@ function neonUfo() {
   const g = grid([-10, 0, -5], [10, 36, 5], 3);
   g.tex(T.hull);
   signStand(g, 18);
-  g.add(S.box([-9.5, 17, -1.4], [9.5, 35, -0.4], 0.6), 0x101a22, M.solid);
+  g.add(SB([-9.5, 17, -1.4], [9.5, 35, -0.4], 0.6), 0x101a22, M.solid);
   root.add(mesh(g));
   const n = grid([-10, 16, -1], [10, 36, 2], 3);
   const ring = (cx: number, cy: number, rx: number, ry: number, from = 0, to = Math.PI * 2) => { for (let i = 0; i <= 50; i++) { const a = from + (to - from) * (i / 50); n.add(S.sphere([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, 0.4], 0.65), 0xffffff, M.glow); } };
@@ -211,21 +211,21 @@ function poster() {
   const g = grid([-8, 0, -4], [8, 34, 4], 4);
   g.tex(T.wood);
   for (const sx of [-1, 1]) g.add(S.capsule([sx * 6, 0, 0], [sx * 6, 31, -1.6], 0.6), PAL.wood, M.solid);
-  g.add(S.box([-7, 10, -2.2], [7, 31, -1.2]), PAL.woodDark, M.solid);
-  g.add(S.box([-6.2, 10.8, -1.4], [6.2, 30.2, -0.8]), (x, y) => mix(0xefe2b8, 0xd8c690, (Math.sin(x * 0.7) + Math.sin(y * 0.5)) * 0.1 + 0.2), M.solid);
+  g.add(SB([-7, 10, -2.2], [7, 31, -1.2]), PAL.woodDark, M.solid);
+  g.add(SB([-6.2, 10.8, -1.4], [6.2, 30.2, -0.8]), (x, y) => mix(0xefe2b8, 0xd8c690, (Math.sin(x * 0.7) + Math.sin(y * 0.5)) * 0.1 + 0.2), M.solid);
   stampText(g, 'WANTED', -textWidth('WANTED', 0.33) / 2, 29.0, -0.9, 0.33, 0x7a2a1a, M.solid, 0.4);
   g.add(S.ellipsoid([0, 21, -0.6], [3.6, 3.2, 0.5]), 0x6fd062, M.jelly);           // mugshot head
   for (const sx of [-1, 1]) g.add(S.ellipsoid([sx * 1.5, 21, -0.1], [1, 1.6, 0.3]), 0x0b0b0b, M.gloss);
   stampText(g, 'AREA 51', -textWidth('AREA 51', 0.28) / 2, 15.6, -0.9, 0.28, 0x3a2a1a, M.solid, 0.4);
   g.add(S.sphere([0, 12.4, -0.5], 1), 0xd8a24a, M.solid);                           // the burger reward
-  g.add(S.box([-1.1, 12, -0.6], [1.1, 12.4, 0.4]), 0x5a3a1a, M.solid);
+  g.add(SB([-1.1, 12, -0.6], [1.1, 12.4, 0.4]), 0x5a3a1a, M.solid);
   return mesh(g);
 }
 function graffiti() {
   const g = grid([-8, 0, -3], [8, 32, 3], 2);
   g.tex(T.hull);
-  g.add(S.box([-7.6, 0, -2], [7.6, 31, 0]), (x, y) => plate(PAL.hullDark, x + 8, y, { pw: 16, ph: 15.5 }), M.metal);
-  for (const sx of [-1, 1]) g.add(S.box([sx * 7 - 1, 0, -3], [sx * 7 + 1, 2, 3]), PAL.hullDeep, M.metal);
+  g.add(SB([-7.6, 0, -2], [7.6, 31, 0]), (x, y) => plate(PAL.hullDark, x + 8, y, { pw: 16, ph: 15.5 }), M.metal);
+  for (const sx of [-1, 1]) g.add(SB([sx * 7 - 1, 0, -3], [sx * 7 + 1, 2, 3]), PAL.hullDeep, M.metal);
   // spray tag: an alien head + ZIB♥
   const spray = (x: number, y: number, r: number, c: number) => g.add(S.sphere([x, y, 0.2], r), c, M.solid);
   for (let a = 0; a < Math.PI * 2; a += 0.12) spray(Math.cos(a) * 4.6, 20 + Math.sin(a) * 4.2, 0.55, PAL.glob);
@@ -274,7 +274,7 @@ function disco() {
 function trafficCone() {
   const g = grid([-6, 0, -6], [6, 16, 6], 3);
   g.tex(T.worn);
-  g.add(S.box([-5.5, 0, -5.5], [5.5, 1, 5.5], 0.6), 0xd8601f, M.solid);
+  g.add(SB([-5.5, 0, -5.5], [5.5, 1, 5.5], 0.6), 0xd8601f, M.solid);
   g.add(S.cone(0, 0, 1, 15, 4.2, 0.9), (_x, y) => ((y > 5 && y < 7) || (y > 10 && y < 11.5) ? 0xf4f4f0 : 0xf07a28), M.solid);
   return mesh(g);
 }
@@ -295,7 +295,7 @@ function gnome() {
   const g = grid([-6, 0, -6], [6, 24, 6], 3);
   g.add(S.cyl(0, 0, 4.4, 0, 1.2), 0x5a8a3a, M.solid);
   g.add(S.ellipsoid([0, 6, 0], [3.6, 5, 3.2]), 0x3a6abf, M.solid);                    // coat
-  g.add(S.box([-3.6, 5.4, -3.2], [3.6, 6.4, 3.2]), 0x3a2a1a, M.solid);                 // belt
+  g.add(SB([-3.6, 5.4, -3.2], [3.6, 6.4, 3.2]), 0x3a2a1a, M.solid);                 // belt
   g.add(S.sphere([0, 12, 0.4], 2.8), 0xf0c8a0, M.solid);                                // face
   g.add(S.ellipsoid([0, 10.4, 2], [2.8, 3.4, 1.6]), 0xf6f6f0, M.fur);                  // beard
   g.add(S.sphere([0, 12.2, 3.2], 0.9), 0xe08a7a, M.solid);                              // nose
@@ -318,11 +318,11 @@ function chomper() {
   const head = new THREE.Group(); head.name = 'head'; put(head, 1, 14, 0.5);
   const top = grid([-5, -1, -5], [5, 5, 5], 3);
   top.add(S.ellipsoid([0, 0.6, 0], [4.6, 3.2, 4.2]), (x, y, z) => (y < 0.4 ? 0xb83a5a : hash3(Math.floor(x), Math.floor(y), Math.floor(z), 4) > 0.8 ? 0xffd84a : 0x3faa3a), M.jelly);
-  top.carve(S.box([-5, -2, -5], [5, 0, 5]));
+  top.carve(SB([-5, -2, -5], [5, 0, 5]));
   for (let i = 0; i < 7; i++) top.add(S.cone(-3.6 + i * 1.2, 2.6, -0.4, 1.0, 0.5, 0.05), 0xf6f4ea, M.solid);
   const jaw = grid([-5, -4, -5], [5, 1, 5], 3);
   jaw.add(S.ellipsoid([0, -0.6, 0], [4.4, 2.8, 4]), (_x, y) => (y > -0.4 ? 0xb83a5a : 0x3a9a3a), M.jelly);
-  jaw.carve(S.box([-5, 0, -5], [5, 2, 5]));
+  jaw.carve(SB([-5, 0, -5], [5, 2, 5]));
   for (let i = 0; i < 7; i++) jaw.add(S.cone(-3.6 + i * 1.2, 2.6, -0.2, 1.0, 0.5, 0.05), 0xf6f4ea, M.solid);
   const upper = named(mesh(top), 'upper'); const lower = named(mesh(jaw), 'jaw');
   head.add(upper, lower);
@@ -348,7 +348,7 @@ function eyeplant() {
   e.add(S.sphere([0.9, 0.9, 3.2], 0.45), 0xffffff, M.glow);
   root.add(part('eye', e, 0.5, 18.6, 0));
   const lid = grid([-4, -1, -4], [4, 4.5, 4], 4);
-  lid.add(S.sphere([0, 0, 0], 3.7), 0x5f8a3a, M.jelly); lid.carve(S.box([-5, -5, -5], [5, 0.2, 5]));
+  lid.add(S.sphere([0, 0, 0], 3.7), 0x5f8a3a, M.jelly); lid.carve(SB([-5, -5, -5], [5, 0.2, 5]));
   root.add(part('lid', lid, 0.5, 18.6, 0));
   return root;
 }
@@ -398,7 +398,7 @@ function tesla() {
   const root = new THREE.Group();
   const g = grid([-7, 0, -7], [7, 38, 7], 2);
   g.tex(T.hull);
-  g.add(S.box([-6.5, 0, -6.5], [6.5, 4, 6.5], 0.8), (x, y, z) => (y < 1.2 ? hazard(x + z, y * 3, 2.5) : PAL.hullDark), M.metal);
+  g.add(SB([-6.5, 0, -6.5], [6.5, 4, 6.5], 0.8), (x, y, z) => (y < 1.2 ? hazard(x + z, y * 3, 2.5) : PAL.hullDark), M.metal);
   g.add(S.cyl(0, 0, 2.6, 4, 28), (_x, y) => (Math.floor(y * 2) % 2 ? 0xc87a3a : 0xa85a2a), M.metal);   // copper coil windings
   for (const y of [8, 16, 24]) g.add(S.torus([0, y, 0], [0, 1, 0], 3.4, 0.5), 0xd8d8e0, M.solid);
   root.add(mesh(g));
@@ -411,10 +411,10 @@ function tesla() {
 function microscope() {
   const g = grid([-7, 0, -7], [7, 24, 7], 3);
   g.tex(T.paint);
-  g.add(S.box([-6, 0, -5], [6, 2, 6], 0.8), PAL.paintCream, M.solid);
+  g.add(SB([-6, 0, -5], [6, 2, 6], 0.8), PAL.paintCream, M.solid);
   g.add(S.capsule([0, 2, -3.5], [0, 15, -3.5], 1.6), PAL.paintCream, M.solid);          // arm
-  g.add(S.box([-4, 7, -2], [4, 8, 4], 0.4), PAL.hullDark, M.metal);                       // stage
-  g.add(S.box([-2.4, 8, -0.6], [2.4, 8.4, 1.8]), 0xd8f0f4, M.glass);                      // slide
+  g.add(SB([-4, 7, -2], [4, 8, 4], 0.4), PAL.hullDark, M.metal);                       // stage
+  g.add(SB([-2.4, 8, -0.6], [2.4, 8.4, 1.8]), 0xd8f0f4, M.glass);                      // slide
   g.add(S.ellipsoid([0, 8.6, 0.6], [1.2, 0.4, 0.8]), 0x8cf56b, M.glow);                   // goo
   g.add(S.capsule([0, 15, -3.5], [0, 12, 1.2], 1.8), PAL.paintCream, M.solid);            // head
   g.add(S.capsule([0, 12, 1.2], [0, 9.8, 1.2], 0.9), PAL.chrome, M.metal);                // objective
@@ -426,9 +426,9 @@ function microscope() {
 function jars() {
   const g = grid([-8, 0, -6], [8, 26, 6], 3);
   g.tex(T.wood);
-  g.add(S.box([-7.5, 0, -5], [7.5, 2, 5], 0.6), PAL.woodDark, M.solid);
-  g.add(S.box([-7.5, 12, -5], [7.5, 13.4, 5], 0.4), PAL.woodDark, M.solid);
-  for (const sx of [-1, 1]) g.add(S.box([sx * 7 - 0.6, 0, -1], [sx * 7 + 0.6, 13, 1]), PAL.woodDark, M.solid);
+  g.add(SB([-7.5, 0, -5], [7.5, 2, 5], 0.6), PAL.woodDark, M.solid);
+  g.add(SB([-7.5, 12, -5], [7.5, 13.4, 5], 0.4), PAL.woodDark, M.solid);
+  for (const sx of [-1, 1]) g.add(SB([sx * 7 - 0.6, 0, -1], [sx * 7 + 0.6, 13, 1]), PAL.woodDark, M.solid);
   const jar = (x: number, y: number, r: number, h: number, liquid: number, thing: (cx: number, cy: number) => void) => {
     g.add(S.cyl(x, 0, r, y, y + h), PAL.glass, M.glass);
     g.add(S.cyl(x, 0, r - 0.5, y, y + h * 0.8), liquid, M.glass);
@@ -455,7 +455,7 @@ function brainTank() {
   root.add(mesh(g));
   const b = grid([-5, -4, -5], [5, 4, 5], 4);
   b.add(smoothUnion(S.ellipsoid([-1.3, 0, 0], [2.2, 2.4, 3]), S.ellipsoid([1.3, 0, 0], [2.2, 2.4, 3]), 1), (x, y, z) => (Math.sin(x * 3 + Math.sin(z * 2.5) * 1.5) > 0.6 || Math.sin(z * 3.3 + y * 2) > 0.8 ? 0xd86a8a : 0xf4a0b4), M.jelly);
-  b.carve(S.box([-0.15, -3, -4], [0.15, 3, 4]));
+  b.carve(SB([-0.15, -3, -4], [0.15, 3, 4]));
   b.add(S.capsule([0, -2, 0], [0, -3.6, -0.6], 0.6), 0xe88aa0, M.jelly);
   root.add(part('brain', b, 0, 14, 0));
   return root;
@@ -466,7 +466,7 @@ function teleporter() {
   g.tex(T.worn);
   g.add(S.cyl(0, 0, 7.6, 0, 2.4), (x, _y, z) => { const r = Math.hypot(x, z), a = Math.atan2(z, x); if (r > 6.8) return Math.floor(a * 8 / Math.PI) % 2 ? PAL.hazardY : PAL.hazardK; return PAL.hullDark; }, M.metal);
   g.add(S.cyl(0, 0, 5.6, 2.4, 3), (x, _y, z) => (Math.abs(Math.hypot(x, z) - 3.6) < 0.5 || Math.hypot(x, z) < 1.2 ? 0xffffff : 0x1d3a4a), M.glow);
-  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; g.add(S.box([Math.cos(a) * 6 - 0.8, 2.4, Math.sin(a) * 6 - 0.8], [Math.cos(a) * 6 + 0.8, 5.4, Math.sin(a) * 6 + 0.8], 0.3), PAL.steel, M.metal); g.add(S.sphere([Math.cos(a) * 6, 5.8, Math.sin(a) * 6], 0.7), 0xffffff, M.glow); }
+  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; g.add(SB([Math.cos(a) * 6 - 0.8, 2.4, Math.sin(a) * 6 - 0.8], [Math.cos(a) * 6 + 0.8, 5.4, Math.sin(a) * 6 + 0.8], 0.3), PAL.steel, M.metal); g.add(S.sphere([Math.cos(a) * 6, 5.8, Math.sin(a) * 6], 0.7), 0xffffff, M.glow); }
   root.add(swapGlow(mesh(g), glowMat(PAL.cyan, 1.8), 'pad'));
   const r = grid([-7, -1, -7], [7, 1, 7], 2);
   r.add(S.torus([0, 0, 0], [0, 1, 0], 5.6, 0.45), 0xffffff, M.glow);
@@ -477,14 +477,14 @@ function serverRack() {
   const root = new THREE.Group();
   const g = grid([-7, 0, -7], [7, 38, 7], 2);
   g.tex(T.console);
-  g.add(S.box([-6.5, 0, -6], [6.5, 37, 6], 0.5), PAL.hullDeep, M.metal);
+  g.add(SB([-6.5, 0, -6], [6.5, 37, 6], 0.5), PAL.hullDeep, M.metal);
   for (let r = 0; r < 9; r++) {
     const y = 2 + r * 3.8;
-    g.add(S.box([-5.6, y, 5.6], [5.6, y + 3.2, 6.4]), (x) => (Math.abs(x) > 4.8 ? PAL.steel : (Math.floor(x * 2) % 2 ? 0x1a1f24 : 0x232a30)), M.metal);
+    g.add(SB([-5.6, y, 5.6], [5.6, y + 3.2, 6.4]), (x) => (Math.abs(x) > 4.8 ? PAL.steel : (Math.floor(x * 2) % 2 ? 0x1a1f24 : 0x232a30)), M.metal);
   }
   root.add(mesh(g));
   const leds = grid([-6, 0, 5], [6, 38, 8], 4);
-  for (let r = 0; r < 9; r++) for (let i = 0; i < 4; i++) leds.add(S.box([3 + i * 0.6, 3 + r * 3.8, 6.2], [3.4 + i * 0.6, 3.5 + r * 3.8, 6.8]), [PAL.glob, PAL.cyan, PAL.pink, PAL.amber][i], M.glow);
+  for (let r = 0; r < 9; r++) for (let i = 0; i < 4; i++) leds.add(SB([3 + i * 0.6, 3 + r * 3.8, 6.2], [3.4 + i * 0.6, 3.5 + r * 3.8, 6.8]), [PAL.glob, PAL.cyan, PAL.pink, PAL.amber][i], M.glow);
   root.add(named(mesh(leds), 'leds'));
   return root;
 }
@@ -492,10 +492,10 @@ function generator() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -8], [8, 28, 8], 2);
   g.tex(T.hull);
-  g.add(S.box([-7.5, 0, -6], [7.5, 2, 6], 0.6), (x, y, z) => (y < 0.8 ? hazard(x, z, 3) : PAL.hullDark), M.metal);
-  for (const sx of [-1, 1]) g.add(S.box([sx * 6.6 - 0.8, 2, -1], [sx * 6.6 + 0.8, 16, 1]), PAL.steel, M.metal);
-  g.add(S.box([4, 2, 2.6], [7.5, 9, 6], 0.6), PAL.paintTeal, M.metal);                   // battery box
-  g.add(S.box([4.8, 6.4, 6], [6.8, 8.2, 6.4]), 0xffffff, M.glow);
+  g.add(SB([-7.5, 0, -6], [7.5, 2, 6], 0.6), (x, y, z) => (y < 0.8 ? hazard(x, z, 3) : PAL.hullDark), M.metal);
+  for (const sx of [-1, 1]) g.add(SB([sx * 6.6 - 0.8, 2, -1], [sx * 6.6 + 0.8, 16, 1]), PAL.steel, M.metal);
+  g.add(SB([4, 2, 2.6], [7.5, 9, 6], 0.6), PAL.paintTeal, M.metal);                   // battery box
+  g.add(SB([4.8, 6.4, 6], [6.8, 8.2, 6.4]), 0xffffff, M.glow);
   root.add(mesh(g));
   const w = grid([-1, -12, -12], [1, 12, 12], 2);
   w.add(S.torus([0, 0, 0], [1, 0, 0], 10.4, 0.8), PAL.steel, M.metal);
@@ -514,26 +514,26 @@ function generator() {
 
 // ── arcade ───────────────────────────────────────────────────────────────────
 function cabinetShell(g: VoxGrid, body: number, trim: number, h = 30) {
-  g.add(S.box([-7, 0, -6.5], [7, h, 6], 1), (x, y, z) => (Math.abs(x) > 6.2 ? trim : y < 1.4 ? shade(body, 0.6) : body), M.solid);
-  g.carve(S.box([-6, 19, 4], [6, 28, 7]));                    // screen recess
-  g.add(S.box([-6.2, 14, 4], [6.2, 16, 9], 0.6), shade(body, 0.85), M.solid);                // control deck
+  g.add(SB([-7, 0, -6.5], [7, h, 6], 1), (x, y, z) => (Math.abs(x) > 6.2 ? trim : y < 1.4 ? shade(body, 0.6) : body), M.solid);
+  g.carve(SB([-6, 19, 4], [6, 28, 7]));                    // screen recess
+  g.add(SB([-6.2, 14, 4], [6.2, 16, 9], 0.6), shade(body, 0.85), M.solid);                // control deck
 }
 function slotMachine() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -8], [10, 34, 9], 2);
   g.tex(T.paint);
   cabinetShell(g, 0xc8302a, 0xf2c043, 30);
-  g.add(S.box([-6.6, 30, -6], [6.6, 33, 5.6], 1), 0xf2c043, M.metal);                     // crown
+  g.add(SB([-6.6, 30, -6], [6.6, 33, 5.6], 1), 0xf2c043, M.metal);                     // crown
   for (let i = 0; i < 7; i++) g.add(S.sphere([-5.4 + i * 1.8, 31.6, 5.6], 0.6), 0xffffff, M.glow);
   stampText(g, '777', -textWidth('777', 0.5) / 2, 12.6, 6.1, 0.5, 0xffe14d, M.glow, 0.5);
-  g.add(S.box([-5, 2, 6.1], [5, 6, 6.6]), 0x3a1a14, M.solid);                                // coin tray
-  g.add(S.box([7, 14, -1], [8.6, 18, 1]), PAL.chrome, M.metal);                             // lever base
+  g.add(SB([-5, 2, 6.1], [5, 6, 6.6]), 0x3a1a14, M.solid);                                // coin tray
+  g.add(SB([7, 14, -1], [8.6, 18, 1]), PAL.chrome, M.metal);                             // lever base
   root.add(mesh(g));
   const reels = grid([-6, 19, 3], [6, 28, 5], 3);
   const sym = [0xd8304a, 0xffbe3d, 0x8cf56b];
   for (let i = 0; i < 3; i++) {
     const cx = -3.8 + i * 3.8;
-    reels.add(S.box([cx - 1.6, 19.6, 3.2], [cx + 1.6, 27.4, 4.2]), 0xfff6dc, M.glow);
+    reels.add(SB([cx - 1.6, 19.6, 3.2], [cx + 1.6, 27.4, 4.2]), 0xfff6dc, M.glow);
     reels.add(S.sphere([cx, 23.5, 4.3], 1.1), sym[i], M.glow);
   }
   root.add(named(mesh(reels), 'reels'));
@@ -548,23 +548,23 @@ function arcadeCab() {
   const g = grid([-8, 0, -8], [8, 34, 10], 2);
   g.tex(T.paint);
   cabinetShell(g, 0x3a2a7a, 0x52f2ff, 32);
-  g.add(S.box([-7, 28.5, 4], [7, 32, 6.8], 0.6), 0x1a1240, M.solid);                       // marquee
+  g.add(SB([-7, 28.5, 4], [7, 32, 6.8], 0.6), 0x1a1240, M.solid);                       // marquee
   g.add(S.capsule([-3, 16, 6], [-3, 18, 6.4], 0.4), PAL.hullDeep, M.metal);                 // joystick
   g.add(S.sphere([-3, 18.4, 6.4], 0.9), PAL.red, M.jelly);
   for (let i = 0; i < 3; i++) g.add(S.cyl(1 + i * 2, 6.4 + (i % 2) * 0.6, 0.7, 16, 16.8), [PAL.glob, PAL.pink, PAL.amber][i], M.glow);
-  for (let i = 0; i < 6; i++) g.add(S.box([-6.4 + i * 2.2, 3, 5.2], [-5.4 + i * 2.2, 11, 6.2]), i % 2 ? 0xff6fd6 : 0x52f2ff, M.glow);   // side art stripes
+  for (let i = 0; i < 6; i++) g.add(SB([-6.4 + i * 2.2, 3, 5.2], [-5.4 + i * 2.2, 11, 6.2]), i % 2 ? 0xff6fd6 : 0x52f2ff, M.glow);   // side art stripes
   root.add(mesh(g));
   const mq = grid([-7, 28, 6], [7, 32, 8], 4);
   stampText(mq, 'GLOB', -textWidth('GLOB', 0.5) / 2, 31.4, 6.8, 0.5, 0xffffff, M.glow, 0.4);
   root.add(mesh(mq));
   // voxel screen: a tiny level with our alien hopping over a crater (animated by the world)
   const s = grid([-6, 19, 3], [6, 28, 5], 3);
-  s.add(S.box([-5.8, 19.2, 3.6], [5.8, 27.8, 4.4]), 0x0d0a2a, M.glow);
-  s.add(S.box([-5.8, 19.2, 4.4], [5.8, 20.6, 4.6]), 0x2f8f3a, M.glow);
-  for (let i = 0; i < 9; i++) s.add(S.box([-5.4 + i * 1.3, 25 + (i % 3) * 0.9, 4.4], [-5.1 + i * 1.3, 25.3 + (i % 3) * 0.9, 4.6]), 0xffffff, M.glow);
+  s.add(SB([-5.8, 19.2, 3.6], [5.8, 27.8, 4.4]), 0x0d0a2a, M.glow);
+  s.add(SB([-5.8, 19.2, 4.4], [5.8, 20.6, 4.6]), 0x2f8f3a, M.glow);
+  for (let i = 0; i < 9; i++) s.add(SB([-5.4 + i * 1.3, 25 + (i % 3) * 0.9, 4.4], [-5.1 + i * 1.3, 25.3 + (i % 3) * 0.9, 4.6]), 0xffffff, M.glow);
   root.add(named(mesh(s), 'screen'));
   const hero = grid([-1, 0, 4], [1, 2, 5], 6);
-  hero.add(S.box([-0.7, 0, 4.4], [0.7, 1.4, 4.8]), 0x8cf56b, M.glow);
+  hero.add(SB([-0.7, 0, 4.4], [0.7, 1.4, 4.8]), 0x8cf56b, M.glow);
   root.add(part('hero', hero, -3, 20.8, 0));
   return root;
 }
@@ -572,12 +572,12 @@ function pinball() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -16], [8, 30, 16], 2);
   g.tex(T.paint);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(S.box([sx * 6 - 0.8, 0, sz * 13 - 0.8], [sx * 6 + 0.8, sz > 0 ? 12 : 15, sz * 13 + 0.8]), PAL.chrome, M.metal);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(SB([sx * 6 - 0.8, 0, sz * 13 - 0.8], [sx * 6 + 0.8, sz > 0 ? 12 : 15, sz * 13 + 0.8]), PAL.chrome, M.metal);
   const top = (z: number) => 13 + (14 - z) * 0.1;
-  for (let z = -15; z < 15; z += 0.5) g.add(S.box([-7.5, top(z) - 2.4, z], [7.5, top(z), z + 0.5]), (x, y) => (Math.abs(x) > 6.8 ? 0x8a3fd8 : y > top(z) - 0.6 ? 0x1a1240 : 0x6a2fb0), M.solid);
+  for (let z = -15; z < 15; z += 0.5) g.add(SB([-7.5, top(z) - 2.4, z], [7.5, top(z), z + 0.5]), (x, y) => (Math.abs(x) > 6.8 ? 0x8a3fd8 : y > top(z) - 0.6 ? 0x1a1240 : 0x6a2fb0), M.solid);
   for (const [x, z, c] of [[-3, -6, PAL.pink], [3, -6, PAL.cyan], [0, -10, PAL.amber], [-2, 0, PAL.glob]] as [number, number, number][]) g.add(S.cyl(x, z, 1.4, top(z) - 0.6, top(z) + 1.4), c, M.glow);
-  g.add(S.box([-7.5, 14, -16], [7.5, 28, -14], 0.8), 0x2a1a5a, M.solid);                // backbox
-  g.add(S.box([-6.4, 15.4, -14], [6.4, 26.6, -13.4]), (x, y) => ((Math.floor(x) + Math.floor(y)) % 3 === 0 ? 0xff6fd6 : 0x3a1a8a), M.glow);
+  g.add(SB([-7.5, 14, -16], [7.5, 28, -14], 0.8), 0x2a1a5a, M.solid);                // backbox
+  g.add(SB([-6.4, 15.4, -14], [6.4, 26.6, -13.4]), (x, y) => ((Math.floor(x) + Math.floor(y)) % 3 === 0 ? 0xff6fd6 : 0x3a1a8a), M.glow);
   stampText(g, 'ZETA', -textWidth('ZETA', 0.5) / 2, 24.4, -13.2, 0.5, 0xffffff, M.glow, 0.4);
   root.add(mesh(g));
   const ball = grid([-1, -1, -1], [1, 1, 1], 6); ball.add(S.sphere([0, 0, 0], 0.8), PAL.chrome, M.metal);
@@ -588,10 +588,10 @@ function jukebox() {
   const root = new THREE.Group();
   const g = grid([-9, 0, -7], [9, 32, 8], 2);
   g.tex(T.wood);
-  g.add(smoothUnion(S.box([-8, 0, -6], [8, 22, 6], 1), S.ellipsoid([0, 22, 0], [8, 9, 6]), 1), (x, y) => (Math.abs(x) > 7 ? 0xc87a3a : y < 2 ? 0x5a3a1a : 0x7a4a2a), M.solid);
-  g.add(S.box([-5.6, 3, 5.4], [5.6, 11, 6.4]), (x, y) => ((Math.floor(x * 1.5) + Math.floor(y * 1.5)) % 2 ? 0x2a1a10 : 0x4a2a1a), M.solid);    // speaker grille
-  g.add(S.box([-5, 13, 5.6], [5, 19, 6.6]), 0xfff2c8, M.glow);                            // song cards
-  for (let i = 0; i < 5; i++) g.add(S.box([-4.4 + i * 2, 13.6, 6.6], [-3 + i * 2, 18.4, 6.8]), [0xff6fd6, 0x52f2ff, 0xffe14d, 0x8cf56b, 0xb48cff][i], M.solid);
+  g.add(smoothUnion(SB([-8, 0, -6], [8, 22, 6], 1), S.ellipsoid([0, 22, 0], [8, 9, 6]), 1), (x, y) => (Math.abs(x) > 7 ? 0xc87a3a : y < 2 ? 0x5a3a1a : 0x7a4a2a), M.solid);
+  g.add(SB([-5.6, 3, 5.4], [5.6, 11, 6.4]), (x, y) => ((Math.floor(x * 1.5) + Math.floor(y * 1.5)) % 2 ? 0x2a1a10 : 0x4a2a1a), M.solid);    // speaker grille
+  g.add(SB([-5, 13, 5.6], [5, 19, 6.6]), 0xfff2c8, M.glow);                            // song cards
+  for (let i = 0; i < 5; i++) g.add(SB([-4.4 + i * 2, 13.6, 6.6], [-3 + i * 2, 18.4, 6.8]), [0xff6fd6, 0x52f2ff, 0xffe14d, 0x8cf56b, 0xb48cff][i], M.solid);
   root.add(mesh(g));
   const tube = grid([-9, 0, 5], [9, 32, 8], 3);
   for (let i = 0; i < 40; i++) { const a = Math.PI * (i / 39); tube.add(S.sphere([-Math.cos(a) * 7.2, 21 + Math.sin(a) * 8.4, 6.2], 0.7), 0xffffff, M.glow); }
@@ -603,14 +603,14 @@ function clawMachine() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -8], [8, 38, 8], 2);
   g.tex(T.paint);
-  g.add(S.box([-7.5, 0, -7.5], [7.5, 12, 7.5], 1), (x, y) => (y > 10.5 ? 0xffe14d : Math.abs(x) > 6.8 ? 0xd84aaf : 0xff6fd6), M.solid);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(S.box([sx * 7 - 0.6, 12, sz * 7 - 0.6], [sx * 7 + 0.6, 34, sz * 7 + 0.6]), 0xff6fd6, M.solid);
-  g.add(S.box([-7.5, 34, -7.5], [7.5, 37, 7.5], 0.8), 0xd84aaf, M.solid);
+  g.add(SB([-7.5, 0, -7.5], [7.5, 12, 7.5], 1), (x, y) => (y > 10.5 ? 0xffe14d : Math.abs(x) > 6.8 ? 0xd84aaf : 0xff6fd6), M.solid);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(SB([sx * 7 - 0.6, 12, sz * 7 - 0.6], [sx * 7 + 0.6, 34, sz * 7 + 0.6]), 0xff6fd6, M.solid);
+  g.add(SB([-7.5, 34, -7.5], [7.5, 37, 7.5], 0.8), 0xd84aaf, M.solid);
   stampText(g, 'GRAB', -textWidth('GRAB', 0.5) / 2, 36.4, 7.6, 0.5, 0xffffff, M.glow, 0.4);
-  g.add(S.box([-6.8, 12, -6.8], [6.8, 34, 6.8]), PAL.glass, M.glass);
-  g.carve(S.box([-6.2, 12.5, -6.2], [6.2, 33.5, 6.2]));
+  g.add(SB([-6.8, 12, -6.8], [6.8, 34, 6.8]), PAL.glass, M.glass);
+  g.carve(SB([-6.2, 12.5, -6.2], [6.2, 33.5, 6.2]));
   for (let i = 0; i < 12; i++) { const x = -4.4 + (i % 4) * 3, z = -3.6 + Math.floor(i / 4) * 3.4; g.add(S.sphere([x, 14.6 + (i % 3) * 0.7, z], 1.6), [0x8cf56b, 0x52f2ff, 0xffe14d, 0xb48cff][i % 4], M.jelly); g.add(S.sphere([x - 0.6, 15.2 + (i % 3) * 0.7, z + 1.4], 0.35), 0, M.gloss); g.add(S.sphere([x + 0.6, 15.2 + (i % 3) * 0.7, z + 1.4], 0.35), 0, M.gloss); }
-  g.add(S.box([-2.6, 4, 7.4], [2.6, 8, 8]), 0x111111, M.solid);
+  g.add(SB([-2.6, 4, 7.4], [2.6, 8, 8]), 0x111111, M.solid);
   root.add(mesh(g));
   const c = grid([-3, -6, -3], [3, 1, 3], 3);
   c.add(S.capsule([0, 0, 0], [0, -2.4, 0], 0.4), PAL.steel, M.metal);
@@ -624,7 +624,7 @@ function stringLights() {
   const root = new THREE.Group();
   const g = grid([-16, 0, -2], [16, 40, 2], 2);
   g.tex(T.wood);
-  for (const sx of [-1, 1]) { g.add(S.box([sx * 14 - 0.7, 0, -0.7], [sx * 14 + 0.7, 38, 0.7]), PAL.woodDark, M.solid); g.add(S.box([sx * 14 - 3, 0, -2], [sx * 14 + 3, 1.4, 2], 0.4), PAL.hullDark, M.metal); }
+  for (const sx of [-1, 1]) { g.add(SB([sx * 14 - 0.7, 0, -0.7], [sx * 14 + 0.7, 38, 0.7]), PAL.woodDark, M.solid); g.add(SB([sx * 14 - 3, 0, -2], [sx * 14 + 3, 1.4, 2], 0.4), PAL.hullDark, M.metal); }
   for (let i = 0; i <= 40; i++) { const x = -14 + (i / 40) * 28, y = 37 - Math.sin((i / 40) * Math.PI) * 8; g.add(S.sphere([x, y, 0], 0.35), 0x1a1a1a, M.solid); }
   root.add(mesh(g));
   const b = grid([-16, 20, -2], [16, 40, 2], 3);
@@ -650,7 +650,7 @@ function neonTube() {
   const root = new THREE.Group();
   const g = grid([-5, 0, -5], [5, 30, 5], 3);
   g.tex(T.hull);
-  g.add(S.box([-3.6, 0, -3.6], [3.6, 2.4, 3.6], 0.6), PAL.hullDark, M.metal);
+  g.add(SB([-3.6, 0, -3.6], [3.6, 2.4, 3.6], 0.6), PAL.hullDark, M.metal);
   g.add(S.cyl(0, 0, 1.2, 2.4, 4), PAL.steel, M.metal);
   g.add(S.cyl(0, 0, 1.2, 27, 28.4), PAL.steel, M.metal);
   for (const sx of [-1, 1]) g.add(S.capsule([sx * 1.4, 2.4, 0], [sx * 1.4, 28, 0], 0.25), PAL.steelDark, M.metal);
@@ -680,7 +680,7 @@ export function buildItemModel(id: string): THREE.Object3D {
     if (make) proto = make();
     else {
       const g = grid([-6, 0, -6], [6, 12, 6], 2);
-      g.add(S.box([-5.5, 0, -5.5], [5.5, 11, 5.5], 0.8), (x, y) => plate(PAL.wood, x + 6, y, { pw: 4, ph: 12, bolt: false }), M.solid);
+      g.add(SB([-5.5, 0, -5.5], [5.5, 11, 5.5], 0.8), (x, y) => plate(PAL.wood, x + 6, y, { pw: 4, ph: 12, bolt: false }), M.solid);
       g.add(S.sphere([0, 11.5, 0], 1.4), PAL.glob, M.glow);
       proto = mesh(g);
     }

@@ -5,8 +5,9 @@
 // Units: props are modelled in MODEL units where 16 units = 1 world unit (one floor cell),
 // and sampled at `res` voxels per unit (res 2 → 1/32 world unit voxels).
 import * as THREE from 'three';
-import { M, VoxGrid, hash3, mix, shade, type V3 } from '../core';
+import { M, S, VoxGrid, hash3, mix, shade, type V3 } from '../core';
 import { toObject, type BuildOptions } from '../mesh';
+import { T } from '../tex';
 
 /** world units per model unit */
 export const U = 1 / 16;
@@ -30,7 +31,8 @@ export const PAL = {
  */
 export function plate(base: number, u: number, v: number, o: { pw?: number; ph?: number; bolt?: boolean; edge?: number; grime?: number; y?: number } = {}) {
   let c = plateTint(base, u, v, o.pw ?? 16, o.ph ?? 16, 0.035);
-  if (o.grime && o.y !== undefined) c = mix(c, shade(base, 0.74), Math.max(0, Math.min(1, (o.grime - o.y) / o.grime)) * 0.55);
+  // grime toward the floor in hard bands (pixel-art ramp, no soft gradient)
+  if (o.grime && o.y !== undefined) c = mix(c, shade(base, 0.74), band(Math.max(0, Math.min(1, (o.grime - o.y) / o.grime)), 3) * 0.55);
   return c;
 }
 
@@ -52,8 +54,17 @@ export function plateTint(base: number, u: number, v: number, pw = 16, ph = 16, 
   return shade(base, k);
 }
 
-/** Vertical gradient (bottom → top) for painted surfaces. */
-export const vgrad = (bottom: number, top: number, y: number, y0: number, y1: number) => mix(bottom, top, (y - y0) / (y1 - y0 || 1));
+/** Quantise a 0..1 ramp into n hard steps (banded pixel-art shading instead of smooth gradients). */
+export const band = (t: number, n = 4) => Math.min(n, Math.floor(Math.max(0, Math.min(1, t)) * (n + 1))) / n;
+
+/** Vertical ramp (bottom → top) for painted surfaces, in 4 hard bands. */
+export const vgrad = (bottom: number, top: number, y: number, y0: number, y1: number) => mix(bottom, top, band((y - y0) / (y1 - y0 || 1), 4));
+
+/** Hard-edged box for props: pixel-art silhouettes, no rounded bevels (radius ignored on purpose). */
+export const SB = (min: V3, max: V3, _r?: number) => S.box(min, max, 0);
+
+/** Every prop surface gets a pixel texture, even where a maker didn't stamp one. */
+export const PROP_TEX: Partial<Record<number, number>> = { [M.metal]: T.dense, [M.solid]: T.rough, [M.glass]: T.glass, [M.fur]: T.fabric };
 
 // ── tiny voxel font (3D lettering for signs / labels on props) ───────────────
 const GLYPHS: Record<string, string[]> = {
@@ -101,7 +112,7 @@ export const GLOW_LAMP = new THREE.MeshBasicMaterial({ vertexColors: true, color
 
 /** Mesh a prop grid in ship units (16 model units = 1 world unit), greedy-merged, textured where stamped. */
 export function mesh(g: VoxGrid, o: Omit<BuildOptions, 'size'> & { anchor?: 'none' | 'bottom' | 'center' } = {}): THREE.Group {
-  return toObject(g, { size: U, ao: 0.8, castShadow: true, greedy: true, anchor: o.anchor ?? 'none', ...o, override: { [M.glow]: GLOW, ...(o.override ?? {}) } });
+  return toObject(g, { size: U, ao: 0.8, castShadow: true, greedy: true, defaultTex: PROP_TEX, anchor: o.anchor ?? 'none', ...o, override: { [M.glow]: GLOW, ...(o.override ?? {}) } });
 }
 
 /**

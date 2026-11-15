@@ -23,6 +23,8 @@ export const POST = {
   /** red alarm wash 0..1 (critical fuel) */
   uAlarm: { value: 0 },
   uInkOn: { value: 1 },
+  /** palette quantisation: levels per channel in display space (0 = off). Gives banded, hand-picked-looking ramps. */
+  uPosterize: { value: 28 },
 };
 
 const VS = /* glsl */ `out vec2 vUv; void main() { vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -59,7 +61,7 @@ const FINAL_FS = /* glsl */ `
 precision highp float; in vec2 vUv; out vec4 fragColor;
 uniform sampler2D tSrc; uniform sampler2D tBloom; uniform sampler2D tInk; uniform sampler2D tDepth;
 uniform float uBloom; uniform float uExposure; uniform float uSaturation; uniform float uContrast; uniform float uVignette;
-uniform float uSplit; uniform vec3 uSplitLo; uniform vec3 uSplitHi; uniform float uAlarm; uniform float uInkOn;
+uniform float uSplit; uniform vec3 uSplitLo; uniform vec3 uSplitHi; uniform float uAlarm; uniform float uInkOn; uniform float uPosterize;
 uniform float uNear; uniform float uFar;
 float viewDist(float d) { float z = d * 2.0 - 1.0; return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear)); }
 vec3 toneMap(vec3 c) {
@@ -104,6 +106,8 @@ void main() {
   vec2 cc = vUv - 0.5; float r2 = dot(cc, cc);
   col *= mix(1.0, smoothstep(0.95, 0.15, r2 * 1.6), uVignette);
   col = mix(col, col * vec3(1.25, 0.55, 0.5), uAlarm * smoothstep(0.05, 0.45, r2) );
+  // posterise to a limited palette: soft gradients (vignette, falloff, AO) become hard pixel-art bands
+  if (uPosterize > 1.0) col = floor(clamp(col, 0.0, 1.0) * uPosterize + 0.5) / uPosterize;
   fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
 

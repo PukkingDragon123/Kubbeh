@@ -35,6 +35,8 @@ export interface MeshOptions {
   occluder?: VoxGrid;
   /** Merge coplanar faces with identical colour / material / texture / AO into large quads. */
   greedy?: boolean;
+  /** Texture to use for voxels with no stamped texture, per material channel (props: everything textured). */
+  defaultTex?: Partial<Record<number, number>>;
 }
 
 export interface MeshResult {
@@ -67,8 +69,10 @@ export function meshGrid(g: VoxGrid, opt: MeshOptions = {}): MeshResult {
   const [ox, oy, oz] = anchorOffset(g, opt.anchor);
   const filled = (x: number, y: number, z: number) => g.get(x, y, z) || (occ ? occ.get(x, y, z) : 0);
   const solidAt = (x: number, y: number, z: number) => { const m = filled(x, y, z); return m !== 0 && !transparentMat(m); };
-  let anyTex = false;
-  for (let i = 0; i < g.tx.length; i++) if (g.tx[i] && g.mat[i]) { anyTex = true; break; }
+  const dt = opt.defaultTex;
+  const texOf = (idx: number) => g.tx[idx] || (dt ? dt[g.mat[idx]] ?? 0 : 0);
+  let anyTex = !!dt;
+  if (!anyTex) for (let i = 0; i < g.tx.length; i++) if (g.tx[i] && g.mat[i]) { anyTex = true; break; }
 
   const buckets = new Map<number, Bucket>();
   const bucket = (m: number) => { let b = buckets.get(m); if (!b) buckets.set(m, (b = { pos: [], nor: [], col: [], tex: [], idx: [] })); return b; };
@@ -120,7 +124,7 @@ export function meshGrid(g: VoxGrid, opt: MeshOptions = {}): MeshResult {
             const n = [x, y, z]; n[d] += s;
             const nm = filled(n[0], n[1], n[2]);
             if (nm && (!transparentMat(nm) || transparentMat(m))) continue;
-            const c = g.col[idx], t = g.tx[idx];
+            const c = g.col[idx], t = texOf(idx);
             let o0 = 0, o1 = 0, o2 = 0, o3 = 0;
             if (m !== M.glow && aoK > 0) { o0 = cornerOcc(n, uVec, vVec, -1, -1); o1 = cornerOcc(n, uVec, vVec, 1, -1); o2 = cornerOcc(n, uVec, vVec, 1, 1); o3 = cornerOcc(n, uVec, vVec, -1, 1); }
             const id = j * W + i;
@@ -153,7 +157,7 @@ export function meshGrid(g: VoxGrid, opt: MeshOptions = {}): MeshResult {
       const m = g.mat[id];
       if (!m) continue;
       const x = i + g.o[0], y = j + g.o[1], z = k + g.o[2];
-      const c = g.col[id], t = g.tx[id];
+      const c = g.col[id], t = texOf(id);
       const tr = transparentMat(m);
       for (const f of FACES) {
         const n = [x + f.n[0], y + f.n[1], z + f.n[2]];

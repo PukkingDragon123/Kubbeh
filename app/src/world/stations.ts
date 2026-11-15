@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { PanelId } from '../core/types';
 import { M, S, hash3, mix, shade } from '../vox/core';
-import { PAL, U, grid, mesh, plate, hazard, stampText, textWidth, glowMat, vgrad, GLOW_LAMP } from '../vox/props/kit';
+import { PAL, U, grid, mesh, plate, hazard, stampText, textWidth, glowMat, vgrad, GLOW_LAMP, SB } from '../vox/props/kit';
 import { T } from '../vox/tex';
 import { crew, economy, fuel, activeProjectId, projects } from '../core/state';
 import type { Particles } from './particles';
@@ -66,30 +66,30 @@ function computer(): Station {
   const d = grid([-42, 0, -14], [42, 66, 14], 1.5);
   d.tex(T.console);
   const deskTop = (x: number) => 15 + Math.cos((x / 40) * Math.PI * 0.5) * 0.5;
-  d.add(S.box([-40, 0, -12], [40, 14, 10], 1.2), (x, y, z) => {
+  d.add(SB([-40, 0, -12], [40, 14, 10], 1.2), (x, y, z) => {
     if (y < 1.5) return PAL.hullDeep;
     if (z > 8 && y > 4 && y < 6) return x % 10 < 0.8 ? PAL.hullDark : PAL.paintTeal;          // front teal band
     return plate(PAL.hullDark, x + 40, y, { pw: 20, ph: 14 });
   }, M.metal);
-  d.add(S.box([-41, 14, -13], [41, 16, 12], 0.8), (x, _y, z) => (z > 10 ? PAL.hullHi : plate(PAL.steelDark, x + 41, z + 13, { pw: 82, ph: 25, bolt: false })), M.metal);
+  d.add(SB([-41, 14, -13], [41, 16, 12], 0.8), (x, _y, z) => (z > 10 ? PAL.hullHi : plate(PAL.steelDark, x + 41, z + 13, { pw: 82, ph: 25, bolt: false })), M.metal);
   // keyboards
   for (const kx of [-24, 0, 24]) {
-    d.add(S.box([kx - 9, 16, 2], [kx + 9, 17, 9], 0.3), PAL.hullDeep, M.metal);
-    for (let i = 0; i < 8; i++) for (let j = 0; j < 3; j++) d.add(S.box([kx - 8 + i * 2.05, 17, 3 + j * 2], [kx - 6.6 + i * 2.05, 17.6, 4.4 + j * 2]), (i + j) % 5 === 0 ? 0xffffff : 0x2f3a40, (i + j) % 5 === 0 ? M.glow : M.solid);
+    d.add(SB([kx - 9, 16, 2], [kx + 9, 17, 9], 0.3), PAL.hullDeep, M.metal);
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 3; j++) d.add(SB([kx - 8 + i * 2.05, 17, 3 + j * 2], [kx - 6.6 + i * 2.05, 17.6, 4.4 + j * 2]), (i + j) % 5 === 0 ? 0xffffff : 0x2f3a40, (i + j) % 5 === 0 ? M.glow : M.solid);
   }
   // big monitors on articulated arms: frames only, holo content is live voxels
   const monitor = (cx: number, w: number, h: number, y0: number, tilt: number) => {
     d.tex(T.paint);
-    d.add(S.box([cx - 1.4, 16, -10], [cx + 1.4, y0, -8]), PAL.steelDark, M.metal);
-    d.add(S.box([cx - w / 2 - 1.6, y0, -11 + tilt], [cx + w / 2 + 1.6, y0 + h + 3, -7.6 + tilt], 0.8), (x, y) => (y > y0 + h + 1.8 ? PAL.hullHi : PAL.hullDeep), M.metal);
-    d.carve(S.box([cx - w / 2, y0 + 1.5, -8.4 + tilt], [cx + w / 2, y0 + h + 1.5, -7 + tilt]));
-    d.add(S.box([cx - w / 2, y0 + 1.5, -9 + tilt], [cx + w / 2, y0 + h + 1.5, -8.4 + tilt]), 0x04120c, M.gloss);
+    d.add(SB([cx - 1.4, 16, -10], [cx + 1.4, y0, -8]), PAL.steelDark, M.metal);
+    d.add(SB([cx - w / 2 - 1.6, y0, -11 + tilt], [cx + w / 2 + 1.6, y0 + h + 3, -7.6 + tilt], 0.8), (x, y) => (y > y0 + h + 1.8 ? PAL.hullHi : PAL.hullDeep), M.metal);
+    d.carve(SB([cx - w / 2, y0 + 1.5, -8.4 + tilt], [cx + w / 2, y0 + h + 1.5, -7 + tilt]));
+    d.add(SB([cx - w / 2, y0 + 1.5, -9 + tilt], [cx + w / 2, y0 + h + 1.5, -8.4 + tilt]), 0x04120c, M.gloss);
     d.add(S.sphere([cx + w / 2 - 0.4, y0 + 0.7, -7.4 + tilt], 0.5), 0xffffff, M.glow);
   };
   monitor(-25, 18, 13, 22, 1.5); monitor(0, 26, 18, 24, 0); monitor(25, 18, 13, 22, 1.5);
   // under-desk server with blinky lights
-  d.add(S.box([28, 1.5, -8], [38, 13, 8], 0.6), PAL.hullDeep, M.metal);
-  for (let i = 0; i < 5; i++) d.add(S.box([29 + i * 1.8, 10, 8], [30 + i * 1.8, 11, 8.6]), [PAL.glob, PAL.pink, PAL.cyan, PAL.amber, PAL.glob][i], M.glow);
+  d.add(SB([28, 1.5, -8], [38, 13, 8], 0.6), PAL.hullDeep, M.metal);
+  for (let i = 0; i < 5; i++) d.add(SB([29 + i * 1.8, 10, 8], [30 + i * 1.8, 11, 8.6]), [PAL.glob, PAL.pink, PAL.cyan, PAL.amber, PAL.glob][i], M.glow);
   // hologram emitter puck
   d.add(S.cyl(0, 6, 4, 16, 18), PAL.steel, M.metal);
   d.add(S.cyl(0, 6, 2.6, 18, 18.6), 0xffffff, M.glow);
@@ -151,14 +151,14 @@ function ideaDesk(): Station {
   const d = grid([-24, 0, -12], [24, 60, 10], 1.5);
   d.tex(T.wood);
   // curved wooden-and-brass desk facing the room
-  d.add(S.box([-20, 0, -6], [20, 13, 6], 1.2), (x, y, z) => {
+  d.add(SB([-20, 0, -6], [20, 13, 6], 1.2), (x, y, z) => {
     if (y > 11.6) return PAL.woodDark;
     if (z > 4.6) return x % 8 < 0.7 ? PAL.woodDark : PAL.wood;
     return PAL.wood;
   }, M.solid);
-  d.add(S.box([-21, 13, -7], [21, 15, 7], 0.8), 0x3a2414, M.solid);
-  d.add(S.box([-19, 15, -6], [-11, 16, 0]), 0xefe2b8, M.solid);                                 // paper stack
-  for (let i = 0; i < 4; i++) d.add(S.box([-18.5 + i * 0.3, 16 + i * 0.6, -5.5], [-11.5 + i * 0.3, 16.5 + i * 0.6, -0.5]), mix(0xefe2b8, 0xffffff, i * 0.2), M.solid);
+  d.add(SB([-21, 13, -7], [21, 15, 7], 0.8), 0x3a2414, M.solid);
+  d.add(SB([-19, 15, -6], [-11, 16, 0]), 0xefe2b8, M.solid);                                 // paper stack
+  for (let i = 0; i < 4; i++) d.add(SB([-18.5 + i * 0.3, 16 + i * 0.6, -5.5], [-11.5 + i * 0.3, 16.5 + i * 0.6, -0.5]), mix(0xefe2b8, 0xffffff, i * 0.2), M.solid);
   d.add(S.cyl(14, -2, 2.2, 15, 21), PAL.pink, M.metal); d.add(S.capsule([16.2, 19, -2], [17.6, 17, -2], 0.6), PAL.pink, M.metal); // mug
   d.add(S.cyl(14, -2, 1.7, 20, 20.6), 0x5a3a1a, M.solid);
   // brass hologram projector + idea bulb machine
@@ -168,7 +168,7 @@ function ideaDesk(): Station {
   for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; d.add(S.sphere([Math.cos(a) * 4.4, 17, -1 + Math.sin(a) * 4.4], 0.6), PAL.chrome, M.metal); }
   // chalk board behind
   d.tex(0);
-  d.add(S.box([-23, 20, -11], [23, 58, -9], 1), (x, y) => (Math.min(x + 23, 23 - x, y - 20, 58 - y) < 2 ? PAL.woodDark : 0x1e3a2a), M.solid);
+  d.add(SB([-23, 20, -11], [23, 58, -9], 1), (x, y) => (Math.min(x + 23, 23 - x, y - 20, 58 - y) < 2 ? PAL.woodDark : 0x1e3a2a), M.solid);
   // chalk doodles in voxels: a jelly alien, an arrow, "IDEA!", a jump arc
   const chalk = 0xe8f4e0;
   for (let a = 0; a < Math.PI * 2; a += 0.06) d.add(S.sphere([12 + Math.cos(a) * 5.4, 41 + Math.sin(a) * 5, -8.8], 0.45), chalk, M.solid);
@@ -176,8 +176,8 @@ function ideaDesk(): Station {
   for (const sx of [-1, 1]) d.add(S.capsule([12 + sx * 2.5, 45.6, -8.8], [12 + sx * 4.2, 50, -8.8], 0.4), chalk, M.solid);
   stampText(d, 'IDEA!', -21, 55, -8.8, 1, PAL.amber, M.solid, 0.5);
   for (let i = 0; i <= 30; i++) { const x = -20 + i * 0.75, y = 27 + Math.sin((i / 30) * Math.PI) * 10; d.add(S.sphere([x, y, -8.8], 0.45), chalk, M.solid); }
-  d.add(S.box([-21, 25, -9], [-18, 28, -8.4]), PAL.pink, M.solid);
-  d.add(S.box([-1, 25, -9], [2, 28, -8.4]), PAL.cyan, M.solid);
+  d.add(SB([-21, 25, -9], [-18, 28, -8.4]), PAL.pink, M.solid);
+  d.add(SB([-1, 25, -9], [2, 28, -8.4]), PAL.cyan, M.solid);
   const body = setGlow(mesh(d), glowMat(0xffd8f0, 1.0));
   g.add(body);
   // floating hologram brain (voxel, additive)
@@ -185,7 +185,7 @@ function ideaDesk(): Station {
   const bg = grid([-7, -6, -6], [7, 6, 6], 2);
   bg.add(S.ellipsoid([-2.4, 0, 0], [4, 4.4, 5.2]), (x, y, z) => (Math.sin(x * 2 + Math.sin(z * 1.7) * 2) > 0.5 ? 0xffffff : 0xff9ae2), M.glow);
   bg.add(S.ellipsoid([2.4, 0, 0], [4, 4.4, 5.2]), (x, y, z) => (Math.sin(z * 2.2 + y * 1.6) > 0.5 ? 0xffffff : 0xff9ae2), M.glow);
-  bg.carve(S.box([-0.25, -6, -6], [0.25, 6, 6]));
+  bg.carve(SB([-0.25, -6, -6], [0.25, 6, 6]));
   const brainMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(0.85, 0.6, 0.9), transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
   const bm = mesh(bg, { castShadow: false }); bm.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = brainMat; });
   brain.add(bm);
@@ -222,7 +222,7 @@ function fuelTank(fx: Particles): Station & { lamps: THREE.MeshBasicMaterial[] }
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
     const x = Math.cos(a) * (R + 2), z = Math.sin(a) * (R + 2);
-    t.add(S.box([x - 1.4, 8, z - 1.4], [x + 1.4, 8 + H, z + 1.4], 0.4), (_x, y) => (Math.floor(y) % 12 < 1 ? PAL.chrome : PAL.steel), M.metal);
+    t.add(SB([x - 1.4, 8, z - 1.4], [x + 1.4, 8 + H, z + 1.4], 0.4), (_x, y) => (Math.floor(y) % 12 < 1 ? PAL.chrome : PAL.steel), M.metal);
   }
   // marker rings at 50/25/10 with lamp housings (lamps are separate, animated)
   const markers = [0.5, 0.25, 0.1];
@@ -236,7 +236,7 @@ function fuelTank(fx: Particles): Station & { lamps: THREE.MeshBasicMaterial[] }
   t.add(S.capsule([-16, 4, -10], [-16, 4, -26], 2.4), PAL.paintTeal, M.metal);
   t.add(S.disc([-16, 4, -18], [0, 0, 1], 4, 0.8, 8), PAL.paintRed, M.metal);
   // FUEL sign plate on the cap
-  t.tex(T.paint).add(S.box([-10, 8 + H + 1, R + 1.6], [10, 8 + H + 7, R + 2.4]), PAL.hazardY, M.metal);
+  t.tex(T.paint).add(SB([-10, 8 + H + 1, R + 1.6], [10, 8 + H + 7, R + 2.4]), PAL.hazardY, M.metal);
   t.tex(0);
   stampText(t, 'FUEL', -textWidth('FUEL', 1) / 2, 8 + H + 6, R + 2.4, 1, PAL.hazardK, M.solid, 0.6);
   const shell = mesh(t);
@@ -320,30 +320,30 @@ function vending(): Station {
   g.position.set(11.15, 0, -1.4); g.rotation.y = -Math.PI / 2;
   const v = grid([-15, 0, -10], [15, 56, 12], 1.5);
   v.tex(T.paint);
-  v.add(S.box([-14, 0, -9], [14, 52, 9], 1.6), (x, y) => (y < 2 ? PAL.hullDeep : Math.abs(x) > 12.4 ? PAL.pink : 0xd84aaf), M.solid);
-  v.carve(S.box([-12, 18, 6], [5, 46, 10]));
-  v.add(S.box([-12, 18, 6], [5, 46, 6.8]), 0x1a0f22, M.solid);
+  v.add(SB([-14, 0, -9], [14, 52, 9], 1.6), (x, y) => (y < 2 ? PAL.hullDeep : Math.abs(x) > 12.4 ? PAL.pink : 0xd84aaf), M.solid);
+  v.carve(SB([-12, 18, 6], [5, 46, 10]));
+  v.add(SB([-12, 18, 6], [5, 46, 6.8]), 0x1a0f22, M.solid);
   // capsule rows (each a voxel gene capsule: two-tone with a glowing helix stripe)
   const caps = [PAL.glob, PAL.cyan, PAL.amber, PAL.violet, PAL.pink];
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
     const x = -9.6 + c * 4.1, y = 21.5 + r * 6.4;
-    v.tex(T.plateBig).add(S.box([x - 1.8, y - 2.4, 6.8], [x + 1.8, y - 2, 9]), PAL.chrome, M.metal);
+    v.tex(T.plateBig).add(SB([x - 1.8, y - 2.4, 6.8], [x + 1.8, y - 2, 9]), PAL.chrome, M.metal);
     v.tex(0);
     v.add(S.capsule([x, y - 0.6, 7.8], [x, y + 1.8, 7.8], 1.2), (px, py) => (py > y + 0.6 ? 0xf6f6f6 : caps[(r + c) % 5]), M.jelly);
-    v.add(S.box([x - 0.25, y - 0.4, 8.8], [x + 0.25, y + 1.6, 9.1]), 0xffffff, M.glow);
+    v.add(SB([x - 0.25, y - 0.4, 8.8], [x + 0.25, y + 1.6, 9.1]), 0xffffff, M.glow);
   }
-  v.tex(T.glass).add(S.box([-12.4, 17.6, 9], [5.4, 46.4, 9.6]), PAL.glass, M.glass);
+  v.tex(T.glass).add(SB([-12.4, 17.6, 9], [5.4, 46.4, 9.6]), PAL.glass, M.glass);
   v.tex(T.console);
   // keypad & coin slot panel
-  v.add(S.box([6.5, 20, 6], [12.5, 44, 9.4], 0.4), PAL.hullDark, M.metal);
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) v.add(S.box([7.4 + c * 1.8, 30 + r * 2.2, 9.4], [8.6 + c * 1.8, 31.4 + r * 2.2, 10]), (r + c) % 4 === 0 ? 0xffffff : 0x8a9aa4, (r + c) % 4 === 0 ? M.glow : M.metal);
-  v.add(S.box([8.5, 24, 9.4], [10.5, 26.6, 9.8]), PAL.hazardK, M.solid);
-  v.add(S.box([7, 40, 9.4], [12, 43, 9.8]), 0x2fd8ff, M.glow);
-  v.add(S.box([-10, 5, 8], [8, 12, 9.6], 0.6), PAL.hullDeep, M.metal);                       // dispense tray
+  v.add(SB([6.5, 20, 6], [12.5, 44, 9.4], 0.4), PAL.hullDark, M.metal);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) v.add(SB([7.4 + c * 1.8, 30 + r * 2.2, 9.4], [8.6 + c * 1.8, 31.4 + r * 2.2, 10]), (r + c) % 4 === 0 ? 0xffffff : 0x8a9aa4, (r + c) % 4 === 0 ? M.glow : M.metal);
+  v.add(SB([8.5, 24, 9.4], [10.5, 26.6, 9.8]), PAL.hazardK, M.solid);
+  v.add(SB([7, 40, 9.4], [12, 43, 9.8]), 0x2fd8ff, M.glow);
+  v.add(SB([-10, 5, 8], [8, 12, 9.6], 0.6), PAL.hullDeep, M.metal);                       // dispense tray
   // sign
   // lightbox sign: a lit translucent panel with dark stencil letters (crisp, not neon)
-  v.tex(T.paint).add(S.box([-14, 46.5, 7], [14, 55, 10], 1), 0x3a1a3a, M.metal);
-  v.tex(0).add(S.box([-13, 47.4, 9.6], [13, 54.2, 10.2]), 0xfff2fa, M.glow);
+  v.tex(T.paint).add(SB([-14, 46.5, 7], [14, 55, 10], 1), 0x3a1a3a, M.metal);
+  v.tex(0).add(SB([-13, 47.4, 9.6], [13, 54.2, 10.2]), 0xfff2fa, M.glow);
   stampText(v, 'GENE-O-MAT', -textWidth('GENE-O-MAT', 0.95) / 2, 53.2, 10.2, 0.95, 0x5a1a4a, M.solid, 0.5);
   const body = setGlow(mesh(v), glowMat(0xffe0f0, 1.0));
   g.add(body);
@@ -358,8 +358,8 @@ function wardrobe(): Station {
   const w = grid([-16, 0, -10], [16, 60, 12], 1.5);
   w.tex(T.paint);
   w.add(smoothUnion2(w), (x, y, z) => (Math.abs(x) > 13.4 ? PAL.hullHi : y < 3 ? PAL.hullDeep : plate(0xd9d2bd, x + 16, y, { pw: 32, ph: 14, bolt: false })), M.metal);
-  w.carve(S.box([-10, 6, 4], [10, 50, 12]));
-  w.tex(T.glass).add(S.box([-10, 6, 3], [10, 50, 4]), 0x9ab4c4, M.gloss);                         // mirror
+  w.carve(SB([-10, 6, 4], [10, 50, 12]));
+  w.tex(T.glass).add(SB([-10, 6, 3], [10, 50, 4]), 0x9ab4c4, M.gloss);                         // mirror
   w.tex(0);
   for (let i = 0; i < 20; i++) w.add(S.sphere([-11.4 + (i % 2) * 22.8, 8 + Math.floor(i / 2) * 4.4, 5], 0.8), 0xffffff, M.glow); // vanity bulbs
   // hat rack on top
@@ -373,22 +373,22 @@ function wardrobe(): Station {
   const hit = hitBox(2, 3.8, 1.4); g.add(hit);
   return { id: 'wardrobe', label: 'Wardrobe Pod', panel: 'wardrobe', group: g, pick: [hit, body], rect: [10.3, 1.6, 11.8, 3.6], anchor: new THREE.Vector3(10.6, 1.7, 2.6), spots: [] };
 }
-function smoothUnion2(_g: unknown) { return S.box([-15, 0, -9], [15, 56, 9], 4); }
+function smoothUnion2(_g: unknown) { return SB([-15, 0, -9], [15, 56, 9], 4); }
 
 // ── FILE ARCHIVE ─────────────────────────────────────────────────────────────
 function cabinet(): Station {
   const g = new THREE.Group();
   g.position.set(-11.2, 0, -3.6); g.rotation.y = Math.PI / 2;
   const c = grid([-10, 0, -8], [10, 60, 10], 1.5);
-  c.tex(T.hull).add(S.box([-9.6, 0, -7], [9.6, 58, 7], 1), PAL.hullDark, M.metal);
+  c.tex(T.hull).add(SB([-9.6, 0, -7], [9.6, 58, 7], 1), PAL.hullDark, M.metal);
   c.tex(T.paint);
   for (let r = 0; r < 6; r++) for (let k = 0; k < 2; k++) {
     const y = 3 + r * 9, x0 = -8.6 + k * 8.8;
-    c.add(S.box([x0, y, 6], [x0 + 8.2, y + 8, 8], 0.5), (x, yy) => (yy > y + 6 && yy < y + 7.2 && Math.abs(x - x0 - 4.1) < 1.6 ? PAL.chrome : [0x4a6a8a, 0x6a8a4a, 0x8a6a4a][(r + k) % 3]), M.metal);
-    c.add(S.box([x0 + 1, y + 2, 8], [x0 + 3.4, y + 3.4, 8.4]), 0xefe2b8, M.solid);
+    c.add(SB([x0, y, 6], [x0 + 8.2, y + 8, 8], 0.5), (x, yy) => (yy > y + 6 && yy < y + 7.2 && Math.abs(x - x0 - 4.1) < 1.6 ? PAL.chrome : [0x4a6a8a, 0x6a8a4a, 0x8a6a4a][(r + k) % 3]), M.metal);
+    c.add(SB([x0 + 1, y + 2, 8], [x0 + 3.4, y + 3.4, 8.4]), 0xefe2b8, M.solid);
   }
   // overflowing folders on top
-  for (let i = 0; i < 5; i++) c.add(S.box([-7 + i * 3, 58, -4 + (i % 2)], [-4.6 + i * 3, 64 - (i % 3), 3]), [0xefe2b8, 0xf6c8a0, 0xd8f0c8][i % 3], M.solid);
+  for (let i = 0; i < 5; i++) c.add(SB([-7 + i * 3, 58, -4 + (i % 2)], [-4.6 + i * 3, 64 - (i % 3), 3]), [0xefe2b8, 0xf6c8a0, 0xd8f0c8][i % 3], M.solid);
   const body = mesh(c);
   g.add(body);
   const hit = hitBox(1.3, 4, 1.2); g.add(hit);
@@ -401,16 +401,16 @@ function research(): Station {
   const g = new THREE.Group();
   const s = grid([-10, 0, -20], [10, 64, 34], 1.5);
   // data shelves (world x -11.9..-10.7, z -0.4..2.0) → local, built facing +x via rotation later
-  s.tex(T.hull).add(S.box([-9, 0, -4], [9, 56, 6]), PAL.hullDark, M.metal);
+  s.tex(T.hull).add(SB([-9, 0, -4], [9, 56, 6]), PAL.hullDark, M.metal);
   s.tex(0);
   for (let r = 0; r < 5; r++) {
     const y = 4 + r * 10.4;
-    s.add(S.box([-8.4, y, -3], [8.4, y + 1, 6]), PAL.steel, M.metal);
+    s.add(SB([-8.4, y, -3], [8.4, y + 1, 6]), PAL.steel, M.metal);
     for (let i = 0; i < 8; i++) {
       const h = 5 + ((hash3(i, r, 9) * 4) | 0);
       const crystal = (i + r) % 3 === 0;
       if (crystal) s.add(S.capsule([-7 + i * 2, y + 1, 2], [-7 + i * 2, y + h, 2], 0.7), [PAL.cyan, PAL.violet, PAL.glob][(i + r) % 3], M.glow);
-      else s.add(S.box([-7.8 + i * 2, y + 1, -1], [-6.4 + i * 2, y + 1 + h, 5]), [0x8a3a3a, 0x3a5a8a, 0x3a8a5a, 0x8a7a3a][(i * 3 + r) % 4], M.solid);
+      else s.add(SB([-7.8 + i * 2, y + 1, -1], [-6.4 + i * 2, y + 1 + h, 5]), [0x8a3a3a, 0x3a5a8a, 0x3a8a5a, 0x8a7a3a][(i * 3 + r) % 4], M.solid);
     }
   }
   // deep-space scanner on a tripod (world ≈ (-11.2, -1.7))
@@ -421,8 +421,8 @@ function research(): Station {
   t.add(S.capsule([0, 28, 0], [6, 52, -2], 3.4, 4.2), (x, y) => (Math.floor(y) % 8 < 1 ? PAL.chrome : PAL.paintCream), M.metal);
   t.add(S.disc([6.4, 53.6, -2], [0.25, 1, -0.08], 4.4, 0.6), 0x2fd8ff, M.glow);
   t.add(S.capsule([-1, 30, 1], [-3, 26, 4], 0.9), PAL.hullDark, M.metal);                                  // eyepiece
-  t.add(S.box([3, 16, 3], [9, 22, 5], 0.4), PAL.hullDeep, M.metal);                                         // readout box
-  t.add(S.box([4, 17, 5], [8, 21, 5.4]), 0x0a2a1a, M.glow);
+  t.add(SB([3, 16, 3], [9, 22, 5], 0.4), PAL.hullDeep, M.metal);                                         // readout box
+  t.add(SB([4, 17, 5], [8, 21, 5.4]), 0x0a2a1a, M.glow);
   const scope = setGlow(mesh(t), glowMat(0xa8e8ff, 1.0));
   sc.add(scope);
   sc.position.set(-11.0, 0, -1.7);
@@ -453,14 +453,14 @@ function cloningVat(fx: Particles): Station & { spawnPoint: THREE.Vector3; flash
     v.tex(T.glass).add(S.cyl(cx, 0, 8, 6, 58), PAL.glass, M.glass);
     v.carve(S.cyl(cx, 0, 7.2, 6, 58));
     v.tex(T.pipe);
-    for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4; v.add(S.box([cx + Math.cos(a) * 8.6 - 0.8, 6, Math.sin(a) * 8.6 - 0.8], [cx + Math.cos(a) * 8.6 + 0.8, 58, Math.sin(a) * 8.6 + 0.8]), PAL.steel, M.metal); }
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4; v.add(SB([cx + Math.cos(a) * 8.6 - 0.8, 6, Math.sin(a) * 8.6 - 0.8], [cx + Math.cos(a) * 8.6 + 0.8, 58, Math.sin(a) * 8.6 + 0.8]), PAL.steel, M.metal); }
     v.tex(0).add(S.cyl(cx, 0, 6.8, 6, 46), (x, y, z) => (Math.sin(y * 0.5 + Math.atan2(z, x - cx) * 2) > 0.85 ? 0xd8ffd0 : 0x6fc87a), M.glow);
   };
   pod(-9); pod(9);
   // control console between pods
-  v.tex(T.console).add(S.box([-4, 0, 2], [4, 22, 10], 0.8), PAL.hullDark, M.metal);
+  v.tex(T.console).add(SB([-4, 0, 2], [4, 22, 10], 0.8), PAL.hullDark, M.metal);
   v.tex(0);
-  v.add(S.box([-3.4, 16, 9.4], [3.4, 21, 10.2]), (x, y) => ((Math.floor(x) + Math.floor(y)) % 3 === 0 ? 0xffffff : 0x1a4a2a), M.glow);
+  v.add(SB([-3.4, 16, 9.4], [3.4, 21, 10.2]), (x, y) => ((Math.floor(x) + Math.floor(y)) % 3 === 0 ? 0xffffff : 0x1a4a2a), M.glow);
   v.add(S.capsule([-2, 23, 6], [-2, 26, 7], 0.5), PAL.chrome, M.metal); v.add(S.sphere([-2, 26.6, 7], 1), PAL.red, M.jelly);
   stampText(v, 'CLONE', -textWidth('CLONE', 0.7) / 2, 13, 10, 0.7, PAL.hazardY, M.solid, 0.5);
   const liquidMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(0.85, 1.0, 0.85), toneMapped: false, transparent: true, opacity: 0.62, depthWrite: false });
@@ -507,14 +507,14 @@ function whiteboard(): Station {
   g.position.set(5.4, 0, -7.6);
   const b = grid([-26, 0, -4], [26, 62, 4], 1.5);
   b.tex(T.paint);
-  b.add(S.box([-24, 18, -3], [24, 56, 0], 1), (x, y) => (Math.min(x + 24, 24 - x, y - 18, 56 - y) < 2.2 ? PAL.hullHi : 0x132028), M.metal);
-  for (const sx of [-1, 1]) b.add(S.box([sx * 20 - 1, 0, -3], [sx * 20 + 1, 18, -1]), PAL.steelDark, M.metal);
+  b.add(SB([-24, 18, -3], [24, 56, 0], 1), (x, y) => (Math.min(x + 24, 24 - x, y - 18, 56 - y) < 2.2 ? PAL.hullHi : 0x132028), M.metal);
+  for (const sx of [-1, 1]) b.add(SB([sx * 20 - 1, 0, -3], [sx * 20 + 1, 18, -1]), PAL.steelDark, M.metal);
   // voxel sticky notes
   const notes: [number, number, number][] = [[-19, 49, PAL.amber], [-12, 49, PAL.pink], [-5, 49, PAL.cyan], [-19, 41, PAL.glob], [-12, 41, PAL.amber], [-19, 33, PAL.pink]];
-  for (const [x, y, c] of notes) { b.add(S.box([x, y - 5, 0], [x + 6, y + 1, 0.6]), c, M.solid); for (let i = 0; i < 3; i++) b.add(S.box([x + 1, y - 1 - i * 1.4, 0.6], [x + 5 - i, y - 0.6 - i * 1.4, 0.8]), shade(c, 0.5), M.solid); }
+  for (const [x, y, c] of notes) { b.add(SB([x, y - 5, 0], [x + 6, y + 1, 0.6]), c, M.solid); for (let i = 0; i < 3; i++) b.add(SB([x + 1, y - 1 - i * 1.4, 0.6], [x + 5 - i, y - 0.6 - i * 1.4, 0.8]), shade(c, 0.5), M.solid); }
   b.tex(0);
   stampText(b, 'PLAN', 6, 54.4, 0, 0.9, 0xd8e8f0, M.solid, 0.5);
-  b.add(S.box([4, 22, 0], [22, 23, 0.4]), PAL.hullHi, M.metal);
+  b.add(SB([4, 22, 0], [22, 23, 0.4]), PAL.hullHi, M.metal);
   const body = mesh(b);
   g.add(body);
   // holo task bars (driven by project tasks)
@@ -547,24 +547,24 @@ function workbench(fx: Particles): Station & { zap(): void } {
   g.position.set(5.8, 0, 1.5);
   const w = grid([-24, 0, -11], [24, 40, 11], 1.5);
   w.tex(T.wood);
-  w.add(S.box([-22, 13, -9], [22, 16, 9], 0.6), (x, _y, z) => plate(0x6a5a4a, x + 22, z + 9, { pw: 11, ph: 18, bolt: false }), M.solid);
+  w.add(SB([-22, 13, -9], [22, 16, 9], 0.6), (x, _y, z) => plate(0x6a5a4a, x + 22, z + 9, { pw: 11, ph: 18, bolt: false }), M.solid);
   w.tex(T.plateBig);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) w.add(S.box([sx * 20 - 1.4, 0, sz * 7 - 1.4], [sx * 20 + 1.4, 13, sz * 7 + 1.4]), PAL.steelDark, M.metal);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) w.add(SB([sx * 20 - 1.4, 0, sz * 7 - 1.4], [sx * 20 + 1.4, 13, sz * 7 + 1.4]), PAL.steelDark, M.metal);
   w.tex(T.paint);
-  w.add(S.box([-20, 4, -8], [20, 5.4, 8]), PAL.steelDark, M.metal);
-  w.add(S.box([-18, 5.4, -6], [-6, 11, 6], 0.6), PAL.paintRed, M.metal);                          // tool chest
-  for (let i = 0; i < 3; i++) w.add(S.box([-17.4, 6 + i * 1.8, 6], [-6.6, 7.4 + i * 1.8, 6.4]), PAL.chrome, M.metal);
+  w.add(SB([-20, 4, -8], [20, 5.4, 8]), PAL.steelDark, M.metal);
+  w.add(SB([-18, 5.4, -6], [-6, 11, 6], 0.6), PAL.paintRed, M.metal);                          // tool chest
+  for (let i = 0; i < 3; i++) w.add(SB([-17.4, 6 + i * 1.8, 6], [-6.6, 7.4 + i * 1.8, 6.4]), PAL.chrome, M.metal);
   // half-built robot buddy on the bench
-  w.add(S.box([-6, 16, -3], [2, 24, 3], 1), PAL.steel, M.metal);
+  w.add(SB([-6, 16, -3], [2, 24, 3], 1), PAL.steel, M.metal);
   w.add(S.sphere([-2, 27, 0], 3.4), PAL.steelDark, M.metal);
   for (const sx of [-1, 1]) w.add(S.sphere([-2 + sx * 1.3, 27.6, 3], 0.8), 0xffffff, M.glow);
   w.add(S.capsule([2, 22, 0], [5, 19, 1], 0.7), PAL.cable, M.solid);
   // sparking machine (the "whack" target)
-  w.add(S.box([10, 16, -6], [20, 26, 5], 1), (x, y) => (y > 24 ? hazard(x, y, 2) : PAL.paintTeal), M.metal);
-  w.add(S.box([12, 18, 5], [18, 23, 5.6]), 0x0a2a1a, M.glow);
+  w.add(SB([10, 16, -6], [20, 26, 5], 1), (x, y) => (y > 24 ? hazard(x, y, 2) : PAL.paintTeal), M.metal);
+  w.add(SB([12, 18, 5], [18, 23, 5.6]), 0x0a2a1a, M.glow);
   w.add(S.capsule([15, 26, 0], [15, 31, 0], 0.5), PAL.chrome, M.metal); w.add(S.sphere([15, 31.6, 0], 1.1), PAL.amber, M.glow);
   // vise
-  w.add(S.box([4, 16, 3], [8, 19, 7]), PAL.steel, M.metal);
+  w.add(SB([4, 16, 3], [8, 19, 7]), PAL.steel, M.metal);
   const body = setGlow(mesh(w), glowMat(0xffe8b0, 1.0));
   g.add(body);
   const hit = hitBox(2.8, 2, 1.2); g.add(hit);

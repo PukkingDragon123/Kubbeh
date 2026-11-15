@@ -212,15 +212,15 @@ function IdeaMsg({ m }: { m: ChatMessage; rev: number }) {
       {m.blocks.map((b, i) => {
         switch (b.type) {
           case 'text': return <Markdown key={i} text={b.text} />;
-          case 'thinking': return show && b.text ? <details key={i} class="dimmer" style={{ fontSize: '12px' }}><summary>Thinking</summary>{b.text}</details> : null;
+          case 'thinking': return show && b.text ? <details key={i} class="dimmer" style={{ fontSize: '13px' }}><summary>Thinking</summary>{b.text}</details> : null;
           case 'tool': return <span key={i} class={`itool ${b.isError ? 'err' : ''}`}>{b.done ? <Icon name={b.isError ? 'warn' : 'check'} size="sm" /> : <i class="spin" />}{b.label}</span>;
           case 'question': return <div key={i} class="iq"><div>{b.question}</div>{b.answer ? <div class="a">→ {b.answer}</div> : <div class="dimmer">Answer in the bubble…</div>}</div>;
-          case 'notice': return <div key={i} class="dimmer" style={{ fontSize: '12px' }}>{b.text}</div>;
+          case 'notice': return <div key={i} class="dimmer" style={{ fontSize: '13px' }}>{b.text}</div>;
           default: return null;
         }
       })}
       {m.pending && !m.blocks.length && <span class="dim">…</span>}
-      {m.error && <div style={{ color: 'var(--red)', fontSize: '12.5px' }}>{m.error}</div>}
+      {m.error && <div style={{ color: 'var(--red)', fontSize: '13px' }}>{m.error}</div>}
     </div>
   );
 }

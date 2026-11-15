@@ -13,6 +13,7 @@ export function runVoxLab(mode: string) {
   if (ns === 'ship') { import('./lab-ship').then((m) => m.run(sub)); return; }
   if (ns === 'ui') { import('./lab-ui').then((m) => m.run(sub)); return; }
   if (ns === 'cos') { import('./lab-cos').then((m) => m.run(sub)); return; }
+  if (mode === 'export') { import('./export-mod').then((m) => m.run()); return; }
   const canvas = document.getElementById('world') as HTMLCanvasElement;
   const r = new THREE.WebGLRenderer({ canvas, antialias: true });
   r.setPixelRatio(Math.min(2, devicePixelRatio));

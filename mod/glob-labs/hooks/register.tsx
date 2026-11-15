@@ -575,7 +575,7 @@ function drawing(on: On) {
     if (e.surface !== 'desktop' && e.surface !== 'mobile') return next(e)
     if (e.props.scene !== 'alley') return next(e)
     const { Svg } = $.ui.resolve(e)
-    return <Svg source={BACKDROP} alt="A night alley: brick walls, buzzing neon signs and a UFO drifting past" isInteractive />
+    return <Svg source={BACKDROP} alt="Deep space seen from the GLOB LABS ship: stars, a ringed planet and a UFO drifting past" isInteractive />
   })
 
   // A question from Claude: the alien who asked runs over with it.

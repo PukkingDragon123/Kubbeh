@@ -95,7 +95,7 @@ export function Shop({ close }: { arg: unknown; close: () => void }) {
           <div class="vend-coin" key={wiggle} >
             <span class="up dim">Gene Points</span>
             <span class={`vend-balance tnum ${wiggle ? 'wiggle' : ''}`}><Icon name="dna" size="lg" />{eco.balance.toLocaleString()}</span>
-            <span class="dimmer" style={{ fontSize: '12px' }}>Earn genes by finishing experiments, writing files, making artifacts and badges.</span>
+            <span class="dimmer" style={{ fontSize: '13px' }}>Earn genes by finishing experiments, writing files, making artifacts and badges.</span>
           </div>
           <div class="vend-detail">
             {item ? <Detail item={item} onBuy={buy} onPlace={place} /> : (
@@ -122,7 +122,7 @@ function Detail({ item, onBuy, onPlace }: { item: CatalogItem; onBuy: (i: Catalo
       <VoxView key={item.id} class="big" size={180} spin="always" eager cacheKey={`shop-big:${item.id}`} make={() => itemOnPedestal(item.id)} alt={item.name} />
       <div class="col gap-4" style={{ textAlign: 'center' }}>
         <span class={`rarity ${item.rarity}`}><i class="rar-gem" />{CAT_LABEL[item.category]}</span>
-        <h3 style={{ fontSize: '19px' }}>{item.name}</h3>
+        <h3 style={{ fontSize: '26px' }}>{item.name}</h3>
         <p class="dim" style={{ margin: 0, fontSize: '13px' }}>{item.blurb}</p>
       </div>
       {item.placeable && <div class="row" style={{ justifyContent: 'center', gap: '6px' }}><span class="chip">Owned {owned}</span><span class="chip c">In storage {unplaced}</span></div>}

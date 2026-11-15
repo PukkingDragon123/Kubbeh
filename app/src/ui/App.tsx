@@ -7,6 +7,10 @@ import { HudDock } from './hud/HudDock';
 import { stageSig } from './hud/stage';
 import { mountHudStage } from '../vox/ui/stage';
 import { installChrome } from './common/chrome';
+import { installPixelSkins } from './common/pixelframes';
+
+// Paint the pixel-art UI skins before the first frame so no panel ever renders unskinned.
+try { installPixelSkins(); } catch (err) { console.warn('[skins]', err); }
 import { warmIcons } from './common/icons';
 import { useRef } from 'preact/hooks';
 import { Toasts, GenePops } from './common/Toasts';

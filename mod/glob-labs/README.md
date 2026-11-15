@@ -1,6 +1,6 @@
 # GLOB LABS for Claude Code
 
-GLOB LABS turns a Claude Code session into a back-alley alien laboratory. A pane shows a pixel-art lab where little jelly aliens act out what Claude is really doing, a fuel tank reads your real Claude usage limits, and an Auto-Saver spends less of them as the tank runs low. It is the Claude Code half of the GLOB LABS project; the full voxel web app lives in `app/` of the same repository.
+GLOB LABS turns a Claude Code session into a back-alley alien laboratory. A pane shows the GLOB LABS ship deck (a real render of the voxel app) where pixel-finished voxel aliens act out what Claude is really doing, a fuel tank reads your real Claude usage limits, and an Auto-Saver spends less of them as the tank runs low. It is the Claude Code half of the GLOB LABS project; the full voxel web app lives in `app/` of the same repository.
 
 ## Install
 

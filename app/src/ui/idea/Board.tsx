@@ -57,7 +57,7 @@ export function DocTab({ doc, onEdited, onAsk }: { doc: DesignDoc; onEdited: (wh
       </div>
       {editing === 'title' ? (
         <input id="doc-title" class="field" value={draft} autoFocus onInput={(e) => setDraft((e.target as HTMLInputElement).value)} onBlur={() => commit('title')} onKeyDown={(e) => { if (e.key === 'Enter') commit('title'); }} />
-      ) : <h3 style={{ fontSize: '22px', cursor: 'text' }} onClick={() => start('title')} title="Click to rename">{doc.title} <Icon name="pencil" size="sm" class="dimmer" /></h3>}
+      ) : <h3 style={{ fontSize: '26px', cursor: 'text' }} onClick={() => start('title')} title="Click to rename">{doc.title} <Icon name="pencil" size="sm" class="dimmer" /></h3>}
 
       {doc.openQuestions.length > 0 && (
         <div class="col gap-4">
@@ -128,7 +128,7 @@ export function MixerTab({ doc, onFuse }: { doc: DesignDoc; onFuse: (picked: Mec
         {bubbles.map((b, i) => <i key={i} class="bub" style={{ left: b.left, animationDelay: b.delay, width: `${b.size}px`, height: `${b.size}px` }} />)}
         <div class="slots">
           {picked.length === 0 && <span class="dim" style={{ fontSize: '13px' }}>Pick 2–3 mechanic cards below to drop them in the chamber.</span>}
-          {picked.map((m) => <span key={m.name} class="slot" style={{ ['--fam' as any]: FAMILY_COLOR[m.family] }}><FamilyGlyph family={m.family} size={26} />{m.name}<button type="button" class="btn ghost sm icon" style={{ minHeight: '20px', width: '20px', borderRadius: '6px' }} aria-label={`Remove ${m.name}`} onClick={() => toggle(m)}><Icon name="close" size="sm" /></button></span>)}
+          {picked.map((m) => <span key={m.name} class="slot" style={{ ['--fam' as any]: FAMILY_COLOR[m.family] }}><FamilyGlyph family={m.family} size={26} />{m.name}<button type="button" class="btn ghost sm icon" style={{ minHeight: '20px', width: '20px' }} aria-label={`Remove ${m.name}`} onClick={() => toggle(m)}><Icon name="close" size="sm" /></button></span>)}
         </div>
         <div class="row wrap gap-8" style={{ position: 'relative', zIndex: 1, marginTop: 'auto' }}>
           <Btn tone="glob" icon="bolt" disabled={picked.length < 2} onClick={() => { sfx('zap', .5); setHot((h) => h + 1); const fc = document.querySelector('.fusion'); if (fc) pixelBurst(fc as HTMLElement, 'bubbles'); unlock('fusion'); onFuse(picked); setPicked([]); }}>Fuse with Glorp</Btn>
@@ -215,7 +215,7 @@ export function PromptTab({ doc }: { doc: DesignDoc }) {
       <div class="col gap-8">
         <span class="label">Detail · {DETAIL_LEVELS[level].label}</span>
         <input id="fp-level" type="range" class="slider" min={0} max={4} step={1} value={level} onInput={(e) => { setLevel(Number((e.target as HTMLInputElement).value)); sfx('tick', .3); }} aria-label="Prompt detail" />
-        <div class="row between dimmer" style={{ fontSize: '11px' }}><span>Compact · fewer tokens</span><span>{DETAIL_LEVELS[level].note}</span><span>Exhaustive</span></div>
+        <div class="row between dimmer" style={{ fontSize: '13px' }}><span>Compact · fewer tokens</span><span>{DETAIL_LEVELS[level].note}</span><span>Exhaustive</span></div>
       </div>
       <div class="row wrap gap-12">
         <div class="col gap-4"><span class="label">Built by</span><Seg value={target} onChange={setTarget} options={TARGETS.map((t) => ({ value: t.value, label: t.label }))} label="Target" /></div>

@@ -7,6 +7,12 @@
 // Slices (art px) are fixed per skin and mirrored in styles.css.
 
 type RGBA = [number, number, number, number];
+/** mix two #rrggbb colours */
+const mix = (a: string, b: string, t: number) => {
+  const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
+  const ch = (s: number) => Math.round(((A >> s) & 255) * (1 - t) + ((B >> s) & 255) * t);
+  return '#' + ((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0');
+};
 const hx = (s: string, a = 255): RGBA => { const v = parseInt(s.replace('#', ''), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255, a]; };
 
 class Img {
@@ -113,12 +119,12 @@ function paintWin() {
 /** Riveted metal plate tile (16×16, seamless): seams on the tile edge, two rivets, one scratch. */
 function plate(x: number, y: number, P: Ramp) {
   const tx = ((x % 16) + 16) % 16, ty = ((y % 16) + 16) % 16;
-  if (tx === 15 || ty === 15) return P[1];
-  if (tx === 0 || ty === 0) return P[4];
+  if (tx === 15 || ty === 15) return P[2];
+  if (tx === 0 || ty === 0) return mix(P[3], P[4], 0.5);
   if ((tx === 2 && ty === 2) || (tx === 13 && ty === 13)) return P[5];
-  if ((tx === 3 && ty === 3) || (tx === 14 && ty === 14)) return P[1];
-  if (ty === 10 && tx >= 5 && tx <= 7) return P[4]; // scratch
-  if (ty === 9 && tx === 8) return P[4];
+  if ((tx === 3 && ty === 3) || (tx === 14 && ty === 14)) return P[2];
+  if (ty === 10 && tx >= 5 && tx <= 7) return mix(P[3], P[4], 0.5); // scratch
+  if (ty === 9 && tx === 8) return mix(P[3], P[4], 0.5);
   return P[3];
 }
 

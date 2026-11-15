@@ -185,7 +185,7 @@ function Machine() {
         <div class="card slot-result col gap-12" key={spinId}>
           {win && <div class="row gap-8"><span class="chip a" style={{ fontSize: '13px' }}><Icon name="star" size="sm" />{win.n >= 3 ? `JACKPOT! ${win.n} gold` : 'Pair of gold'} · +{win.amount} genes</span></div>}
           <div class="idea">{idea}</div>
-          {pitch && <div class="dim" style={{ fontSize: '14px', whiteSpace: 'pre-wrap', borderLeft: '3px solid var(--pink)', paddingLeft: '12px' }}>{pitch}</div>}
+          {pitch && <div class="dim" style={{ fontSize: '13px', whiteSpace: 'pre-wrap', borderLeft: '3px solid var(--pink)', paddingLeft: '12px' }}>{pitch}</div>}
           <div class="row wrap gap-8">
             <Btn tone="glob" icon="idea" onClick={sendToLab}>Send to Idea Lab</Btn>
             <Btn tone="pink" icon="sparkle" onClick={doPitch} disabled={pitching}>{pitching ? 'Pitching…' : pitch ? 'Re-pitch' : 'Pitch it'}</Btn>

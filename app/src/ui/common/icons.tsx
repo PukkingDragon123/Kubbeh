@@ -65,7 +65,7 @@ export function Icon({ name, size, class: cls = '', title }: { name: IconName; s
   if (!url) {
     // no WebGL: a tiny neutral glyph rather than a broken image
     return <span class={`ico ${size ?? ''} ${cls}`} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : 'true'}
-      style={{ borderRadius: '30%', background: 'linear-gradient(180deg,#5b6977,#2b3540)', boxShadow: 'inset 0 1px 0 #fff4' }} />;
+      style={{ background: '#414c58', boxShadow: 'inset 0 2px 0 #5f6c7a, 0 0 0 2px #0a0e14' }} />;
   }
   return (
     <img class={`ico vx ${size ?? ''} ${cls}`} src={url} width={px} height={px} draggable={false} decoding="async"

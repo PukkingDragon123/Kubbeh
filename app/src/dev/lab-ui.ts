@@ -31,7 +31,7 @@ export function run(mode: string) {
   for (const n of iconNames) {
     const cell = document.createElement('div');
     cell.style.cssText = 'display:grid;justify-items:center;gap:4px;padding:8px;border-radius:12px;background:#ffffff08;box-shadow:inset 0 0 0 1px #ffffff12;font:12px NanoPlus,monospace;color:#a9bdcc';
-    const img = document.createElement('img'); img.src = iconURL(n, size); img.width = size; img.height = size;
+    const img = document.createElement('img'); img.src = iconURL(n, size); img.width = size; img.height = size; img.style.imageRendering = 'pixelated';
     cell.append(img, n);
     grid.append(cell);
   }

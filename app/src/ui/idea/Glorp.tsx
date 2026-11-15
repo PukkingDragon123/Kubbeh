@@ -12,6 +12,7 @@ import { buildAlien, type AlienParts, type Face } from '../../vox/alien';
 import { dressAlien } from '../../vox/cosmetics';
 import { VoxView } from '../shop/vox/VoxView';
 import { framed } from '../shop/vox/models';
+import { pixelBurst } from '../shop/vox/pixel';
 
 const POKES = ['Hey! That tickles.', 'I am 94% jelly, please be gentle.', 'Ideas incoming…', 'Blorp.', 'Careful, I bruise purple.'];
 
@@ -61,13 +62,14 @@ export function GlorpPortrait({ onPoke, size = 112 }: { onPoke?: (line: string) 
 
   return (
     <button type="button" class="glorp-port" title="Prof. Glorp — poke him" aria-label="Poke Prof. Glorp"
-      onClick={() => {
+      onClick={(e) => {
         const line = pick(POKES);
         sfx('boing', .55, 1.1); babble(line, 1.25);
         hop.current = performance.now();
         flash.current = { e: pick<Face>(['shocked', 'derp', 'tongue']), until: performance.now() + 900 };
         force((n) => n + 1);
         onPoke?.(line);
+        pixelBurst(e.currentTarget as HTMLElement, 'love', 2);
       }}>
       <VoxView size={size} spin="always" eager cacheKey={`glorp:${lookKey}`} make={make} animate={animate} yaw={0} pitch={0.08} fill={0.98} />
     </button>

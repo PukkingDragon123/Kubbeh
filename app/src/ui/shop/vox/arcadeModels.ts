@@ -16,12 +16,12 @@ function proto(key: string, make: () => THREE.Object3D) {
 export function blob(color: number) {
   return proto('blob' + color, () => {
     const v = VoxGrid.span([-10, -10, -9], [10, 10, 9], 1);
-    v.add(S.ellipsoid([0, -1, 0], [8.4, 7.6, 7.2]), (x, y) => mix(shade(color, 0.72), mix(color, 0xffffff, 0.3), (y + 8) / 16), M.jelly);
+    v.add(S.ellipsoid([0, -1, 0], [8.4, 7.6, 7.2]), (x, y) => mix(shade(color, 0.72), mix(color, 0xffffff, 0.3), (y + 8) / 16), M.solid);
     for (const sx of [-1, 1]) {
       v.paint(S.ellipsoid([sx * 3.2, 0, 6.2], [1.8, 2.6, 2]), 0x07090c, M.gloss);
       v.paint(S.sphere([sx * 3.2 + 0.7, 1.2, 7.3], 0.7), 0xffffff, M.glow);
     }
-    v.add(S.sphere([-3.6, 4.6, 4.6], 1.2), 0xffffff, M.glow);
+    v.add(S.sphere([-3.6, 4.6, 4.6], 1.2), 0xffffff, M.solid);
     return toObject(v, { size: 0.055, anchor: 'center', outline: shade(color, 0.3) });
   });
 }
@@ -91,8 +91,12 @@ export function skyline() {
 export function street() {
   return proto('street', () => {
     const v = VoxGrid.span([-90, -10, -8], [90, 0, 8], 1);
-    v.add(S.box([-90, -10, -8], [90, 0, 8]), (x, _y, z) => (z > 6 ? 0x8cf56b : shade(0x1d2a22, 0.85 + hash3(Math.floor(x), 0, Math.floor(z)) * 0.2)), M.solid);
-    v.recolor((_x, _y, z, c) => (z > 6 ? [c, M.glow] : undefined));
+    // asphalt with paving seams; a painted curb stripe only along the top front edge
+    v.add(S.box([-90, -10, -8], [90, 0, 8]), (x, y, z) => {
+      if (y > -1.5 && z > 6) return (Math.floor(x / 3) % 2) ? 0xffbe3d : 0x2a2416;
+      if (y > -1.5) return shade(0x3a4440, 0.9 + hash3(Math.floor(x), 0, Math.floor(z)) * 0.15);
+      return Math.floor(x) % 9 === 0 ? 0x161c1a : shade(0x222a27, 0.9 + hash3(Math.floor(x), Math.floor(y), 2) * 0.12);
+    }, M.solid);
     return toObject(v, { size: 0.1 });
   });
 }

@@ -14,6 +14,7 @@ import { studioEnvironment } from '../../vox/mesh';
 import { blob, bolt, capsule, Cubes, heart, junk, skyline, stars, street, ufo } from './vox/arcadeModels';
 import { VoxView } from './vox/VoxView';
 import { framed } from './vox/models';
+import { pixelBurst } from './vox/pixel';
 
 const W = 160, H = 120;
 const wx = (x: number) => (x - W / 2) / 10;
@@ -64,9 +65,10 @@ function Game() {
     const canvas = cv.current!;
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
     } catch { return; }
-    renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+    // pixel render: low internal resolution, nearest-neighbour upscale (CSS image-rendering: pixelated)
+    renderer.setPixelRatio(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NeutralToneMapping;
     const scene = new THREE.Scene();
@@ -75,8 +77,7 @@ function Game() {
     scene.environment = studioEnvironment(renderer, 0xb48cff);
     scene.add(new THREE.HemisphereLight('#c8d8ff', '#1a1030', 0.9));
     const key = new THREE.DirectionalLight('#fff0e0', 2.6); key.position.set(-4, 8, 10); scene.add(key);
-    const neon = new THREE.PointLight('#ff6fd6', 18, 18); neon.position.set(5, -3, 3); scene.add(neon);
-    const neon2 = new THREE.PointLight('#8cf56b', 14, 16); neon2.position.set(-6, -4, 3); scene.add(neon2);
+    const fill = new THREE.DirectionalLight('#9fb8ff', 0.8); fill.position.set(6, 2, 4); scene.add(fill);
     const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
 
     // set dressing
@@ -94,7 +95,7 @@ function Game() {
     scene.add(hero.root);
 
     // UFOs with tractor beams
-    const beamMat = new THREE.MeshBasicMaterial({ color: '#a8f8ff', transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const beamMat = new THREE.MeshBasicMaterial({ color: '#9fdcff', transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide });
     const ufos = [{ x: -20, y: 10, vx: 22 }, { x: W + 40, y: 20, vx: -16 }].map((u) => {
       const m = ufo(); scene.add(m);
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.9, 1.8, 16, 1, true), beamMat);
@@ -117,7 +118,8 @@ function Game() {
     const resize = () => {
       const r = canvas.parentElement!.getBoundingClientRect();
       const w = Math.max(1, r.width), h = Math.max(1, r.height);
-      renderer.setSize(w, h, false);
+      const PX = Math.max(2, Math.round(h / 150));
+      renderer.setSize(Math.round(w / PX), Math.round(h / PX), false);
       cam.aspect = w / h;
       const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
       const dist = Math.max(6.4 / tan, 8.4 / (tan * cam.aspect));
@@ -128,7 +130,9 @@ function Game() {
     const ro = new ResizeObserver(resize); ro.observe(canvas.parentElement!);
 
     const finish = (final: number) => {
-      sfx(final > (economy.value.stats.arcadeHigh ?? 0) ? 'fanfare' : 'weird', .5);
+      const best = final > (economy.value.stats.arcadeHigh ?? 0);
+      sfx(best ? 'fanfare' : 'weird', .5);
+      if (best && final > 0) pixelBurst(canvas, 'jackpot');
       setStatMax('arcadeHigh', final);
       bumpStat('arcadeGames');
       setEarned(earnGenes(Math.floor(final / 20), `UFO Catch score ${final}`, undefined, 'arcade'));
@@ -172,7 +176,7 @@ function Game() {
               cmb += 1;
               const pts = (o.kind === 'gene' ? 25 : o.kind === 'pink' ? 15 : 10) * (1 + Math.min(4, Math.floor(cmb / 5)));
               sc += pts; setScore(sc); setCombo(cmb);
-              if (o.kind === 'gene') joyT = 0.7;
+              if (o.kind === 'gene') { joyT = 0.7; const r = canvas.getBoundingClientRect(); const v = new THREE.Vector3(wx(o.x), wy(o.y), 0).project(cam); pixelBurst({ x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }, 'win', 2); }
               sfx(o.kind === 'gene' ? 'coin' : 'plop', .4, 1 + Math.min(.6, cmb * .03));
               cubes.burst(wx(o.x), wy(o.y), o.kind === 'gene' ? 0xffbe3d : o.kind === 'pink' ? 0xff6fd6 : 0x8cf56b, 14);
             }
@@ -192,7 +196,7 @@ function Game() {
         u.m.rotation.set(0.25, t * 1.4, Math.sin(t * 2 + u.x) * 0.08);
         u.beam.visible = u.beamT > 0 || (playing() && Math.sin(t * 0.8 + u.x * 0.05) > 0.7);
         u.beam.position.set(wx(u.x), wy(u.y) - 1.05 + bob, 0);
-        beamMat.opacity = 0.12 + Math.sin(t * 9) * 0.04;
+        beamMat.opacity = 0.08 + (Math.floor(t * 8) % 2) * 0.04;
       }
       for (const o of objs) {
         o.mesh.position.set(wx(o.x), wy(o.y), 0);

@@ -78,10 +78,10 @@ export function Home() {
       <div class="row between"><h3 class="ws-h3">Projects</h3></div>
       <div class="ws-grid">
         <button type="button" class="ws-pcard new" onClick={() => void newProjectFlow('game')}>
-          <span class="ws-glyph xl" style={{ background: 'var(--pink)' }}>🎮</span><b>New game project</b><span class="dim ws-small">Game-dev instructions pre-loaded</span>
+          <Icon name="arcade" size="xl" /><b>New game project</b><span class="dim ws-small">Game-dev instructions pre-loaded</span>
         </button>
         <button type="button" class="ws-pcard new" onClick={() => void newProjectFlow()}>
-          <span class="ws-glyph xl" style={{ background: 'var(--metal-hi)' }}>+</span><b>New project</b><span class="dim ws-small">Chats, files, tasks & instructions together</span>
+          <Icon name="plus" size="xl" /><b>New project</b><span class="dim ws-small">Chats, files, tasks & instructions together</span>
         </button>
         {ps.map((p) => {
           const t = p.tasks ?? []; const d = t.filter((x) => x.status === 'done').length;

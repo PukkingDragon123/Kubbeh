@@ -2,7 +2,8 @@
 // so plain CSS can bolt real 3D hardware onto every panel.
 import * as THREE from 'three';
 import { S } from '../../vox/core';
-import { photoURL, studioRenderer } from '../../vox/studio';
+import { studioRenderer } from '../../vox/studio';
+import { pixelURL } from '../../vox/ui/pixel';
 import { C, M, grid, obj, prism, vgrad } from '../../vox/ui/vkit';
 
 function bolt(): THREE.Object3D {
@@ -23,8 +24,8 @@ function bracket(): THREE.Object3D {
 
 export function installChrome() {
   if (!studioRenderer()) return;
-  const dpr = Math.min(3, Math.max(1, globalThis.devicePixelRatio || 1));
   const root = document.documentElement.style;
-  root.setProperty('--vx-bolt', `url("${photoURL(bolt(), Math.round(24 * dpr), Math.round(24 * dpr), { key: 'chrome:bolt', yaw: -0.1, pitch: 0.12, fill: 0.95 })}")`);
-  root.setProperty('--vx-bracket', `url("${photoURL(bracket(), Math.round(40 * dpr), Math.round(40 * dpr), { key: 'chrome:bracket', yaw: -0.18, pitch: 0.16, fill: 0.98 })}")`);
+  // art pixels: bolt 12 px (shown 1:1), bracket 17 px (shown 2×) — crisp pixel blocks via image-rendering: pixelated
+  root.setProperty('--vx-bolt', `url("${pixelURL(bolt, 12, 12, { key: 'chrome:bolt', yaw: -0.1, pitch: 0.12, fill: 0.95 })}")`);
+  root.setProperty('--vx-bracket', `url("${pixelURL(bracket, 17, 17, { key: 'chrome:bracket', yaw: -0.18, pitch: 0.16, fill: 0.98 })}")`);
 }

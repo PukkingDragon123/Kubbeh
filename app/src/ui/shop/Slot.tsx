@@ -16,6 +16,7 @@ import { VoxView } from './vox/VoxView';
 import { framed } from './vox/models';
 import { buildGlyph, type GlyphName } from './vox/glyphs';
 import { buildLever } from './vox/lever';
+import { pixelBurst } from './vox/pixel';
 import type * as THREE from 'three';
 
 const symKey = (s: Sym) => `sym:${s.icon}:${s.color}:${s.gold ? 1 : 0}`;
@@ -126,7 +127,8 @@ function Machine() {
     if (pay) {
       setWin({ n: golds, amount: pay });
       setTimeout(() => earnGenes(pay, golds >= 3 ? `Slot jackpot (${golds} gold)` : 'Slot: pair of gold', undefined, 'slot'), 200);
-      if (golds >= 3) { sfx('fanfare', .6); unlock('jackpot'); } else sfx('bling', .5);
+      const cab = document.querySelector('.slot-window') as HTMLElement | null;
+      if (golds >= 3) { sfx('fanfare', .6); unlock('jackpot'); if (cab) pixelBurst(cab, 'jackpot'); } else { sfx('bling', .5); if (cab) pixelBurst(cab, 'win'); }
     }
     checkProgress();
   };

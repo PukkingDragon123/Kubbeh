@@ -6,6 +6,7 @@ import type { AlienLook, Expression } from '../core/types';
 import { buildAlien, type AlienParts, type Face } from '../vox/alien';
 import { dressAlien, buildHeldItem, animateCosmetics } from '../vox/cosmetics';
 import type { Anim } from './stations';
+import { inkObject, getPost } from './post';
 
 export type HandItem = 'hammer' | 'wrench' | 'magnifier' | 'box' | 'mug' | 'chalk' | null;
 
@@ -65,6 +66,13 @@ export class Alien {
     this.parts = buildAlien(this.look, ALIEN_SIZE);
     this.parts.root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && !m.userData.outline) m.castShadow = true; });
     dressAlien(this.parts, this.look);
+    // in the ship the ink outline is drawn in screen space by the pixel pipeline: drop the
+    // dilated outline shells (≈half of an alien's triangles) and register the ink colour
+    let ink = 0x14321c;
+    const shells: THREE.Object3D[] = [];
+    this.parts.root.traverse((o) => { if (o.userData.outline) { shells.push(o); const c = ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).color; if (c) ink = c.getHex(); } });
+    for (const s of shells) s.removeFromParent();
+    inkObject(this.parts.root, ink, getPost);
     this.root.add(this.parts.root);
     this.held = null; this.boxAbove = null;
     const h = this.heldId; this.heldId = null; this.hold(h);

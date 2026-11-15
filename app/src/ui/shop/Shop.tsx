@@ -10,6 +10,7 @@ import { Icon, type IconName } from '../common/icons';
 import { CATALOG, catalogById, isStarter, ownsItem } from '../../economy/catalog';
 import { buyItem } from '../../economy/genes';
 import { VoxView } from './vox/VoxView';
+import { pixelBurst } from './vox/pixel';
 import { itemOnPedestal, stationArt, RARITY_COLOR } from './vox/models';
 
 type Tab = 'hq' | 'arcade' | 'wear' | 'skins' | 'ledger';
@@ -43,7 +44,11 @@ export function Shop({ close }: { arg: unknown; close: () => void }) {
 
   const buy = (it: CatalogItem) => {
     const r = buyItem(it.id);
-    if (r.ok) { setDropping(it.id); setTimeout(() => setDropping(null), 750); }
+    if (r.ok) {
+      setDropping(it.id); setTimeout(() => setDropping(null), 750);
+      const el = document.querySelector('.vend-detail .big') ?? document.querySelector(`.vend-slot[aria-pressed="true"]`);
+      if (el) pixelBurst(el as HTMLElement, 'buy');
+    }
     else if (r.reason === 'funds') setWiggle((w) => w + 1);
   };
   const place = (it: CatalogItem) => {

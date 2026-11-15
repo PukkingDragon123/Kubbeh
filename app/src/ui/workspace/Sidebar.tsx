@@ -37,7 +37,7 @@ function ChatRow({ c }: { c: ChatMeta }) {
 export async function newProjectFlow(kind: 'general' | 'game' = 'general') {
   const name = await promptBox(kind === 'game' ? 'New game project' : 'New project', kind === 'game' ? 'My Game' : 'New project', 'Projects keep chats, files, artifacts, tasks and custom instructions together.');
   if (!name) return;
-  const p = createProject({ name: name.trim() || 'Project', kind, glyph: kind === 'game' ? '🎮' : name.trim().slice(0, 1).toUpperCase(),
+  const p = createProject({ name: name.trim() || 'Project', kind, glyph: (name.trim() || 'P').slice(0, 1).toUpperCase(),
     instructions: kind === 'game' ? 'This is a game project. Prefer small playable increments, keep gameplay constants in one config file, and explain controls.' : '' });
   sfx('powerup', .5);
   goHome(p.id);

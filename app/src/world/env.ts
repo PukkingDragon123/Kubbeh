@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { M, S } from '../vox/core';
 import { PAL, U, grid, mesh, hazard, instance, at, glowMat } from '../vox/props/kit';
+import { T } from '../vox/tex';
 import {
   floorTile, wallPanel, rib, backLower, windowBay, upperTrim, ceilingBeam, hangingLamp, reactor, airlock, roboticArm,
   hydroponics, bigSign, planet, asteroid, starfield, type TileKind, type WallKind,
@@ -52,11 +53,13 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   // front cutaway edge of the deck slab (diorama look) with conduits in the cross-section
   {
     const g = grid([0, -16, -2], [384, 1, 2], 1);
-    g.add(S.box([0, -14, -2], [384, 0, 1]), (x, y) => (y > -2 ? hazard(x, y, 3) : y < -13 ? PAL.hullDeep : PAL.hullDark), M.metal);
-    for (let x = 6; x < 384; x += 16) g.add(S.box([x, -10, 1], [x + 4, -6, 1.6]), 0xffffff, M.glow);
+    g.tex(T.worn).add(S.box([0, -14, -2], [384, 0, 1]), (x, y) => (y > -2 ? hazard(x, y, 3) : y < -13 ? PAL.hullDeep : PAL.hullDark), M.metal);
+    g.tex(T.pipe);
+    g.tex(T.hull);
+    for (let x = 8; x < 384; x += 32) { g.tex(0).add(S.box([x, -9, 1], [x + 2, -7, 1.6]), 0xffffff, M.glow); g.tex(T.hull); }
     for (const [y, c] of [[-4, PAL.paintTeal], [-8.5, PAL.paintRed], [-12, PAL.steel]] as [number, number][]) g.add(S.capsule([0, y, 1.2], [384, y, 1.2], 1.1), c, M.metal);
     const edge = mesh(g, { castShadow: false });
-    edge.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = glowMat(PAL.cyan, 1.6); } });
+    edge.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = glowMat(PAL.amber, 2.2); } });
     edge.position.set(ROOM.x0, 0, ROOM.z1);
     group.add(edge);
   }
@@ -112,7 +115,7 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   group.add(instance(hangingLamp(), lampSpots.map(([x, z]) => at(x, ROOM.wallH + 0.4, z))));
   const lamps: THREE.PointLight[] = [];
   for (const [x, y, z, i] of [[-5.5, 5.4, -6.6, 6], [5.5, 5.4, -6.6, 6], [-5, 5.2, 1.8, 7], [4, 5.2, 2.2, 7]] as [number, number, number, number][]) {
-    const l = new THREE.PointLight(0xffd9a0, i, 10, 1.3);
+    const l = new THREE.PointLight(0xffd29a, i, 11, 1.3);
     l.position.set(x, y, z);
     group.add(l); lamps.push(l);
   }
@@ -123,7 +126,7 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   group.add(core);
   const coreRings = core.getObjectByName('rings')!;
   const coreMat = (core.getObjectByName('core')!.children[0] as THREE.Mesh)?.material as THREE.MeshBasicMaterial | undefined;
-  const coreLight = new THREE.PointLight(0x8cf56b, 5, 7, 1.5); coreLight.position.set(-10.6, 3, -6.6); group.add(coreLight);
+  const coreLight = new THREE.PointLight(0x9ff0a0, 2, 4.5, 1.8); coreLight.position.set(-10.6, 3, -6.6); group.add(coreLight);
 
   const lock = airlock();
   lock.position.set(ROOM.x1 - 0.1, 0, 5.6); lock.rotation.y = -Math.PI / 2;
@@ -133,7 +136,7 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   const hydro = hydroponics();
   hydro.position.set(ROOM.x0 + 0.1, 0, 6); hydro.rotation.y = Math.PI / 2;
   group.add(hydro);
-  const hydroLight = new THREE.PointLight(0xc88aff, 3, 5, 1.6); hydroLight.position.set(-10.8, 2.6, 6); group.add(hydroLight);
+  const hydroLight = new THREE.PointLight(0xe8d0ff, 1.4, 4, 1.8); hydroLight.position.set(-10.8, 2.6, 6); group.add(hydroLight);
 
   const arm = roboticArm();
   arm.position.set(4.5, ROOM.wallH + 0.15, 2.6);
@@ -149,6 +152,7 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   // painted deck emblem: a jelly alien head in a ring, centre of the room
   {
     const e = grid([-48, -0.5, -48], [48, 1, 48], 1);
+    e.tex(T.worn);
     e.add(S.cyl(0, 0, 46, 0, 0.5), (x, _y, z) => {
       const r = Math.hypot(x, z);
       if (r > 42) return Math.floor(Math.atan2(z, x) * 12 / Math.PI) % 2 ? PAL.paintTeal : PAL.paintTealDark;
@@ -168,12 +172,14 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
     group.add(em);
   }
 
-  // accent neon lights
-  const accent = (c: number, i: number, x: number, y: number, z: number, d = 6) => { const l = new THREE.PointLight(c, i, d, 1.6); l.position.set(x, y, z); group.add(l); return l; };
-  accent(0x8cf56b, 4, 1.2, 1.4, -5.4, 7);     // console glow
-  accent(0xff6fd6, 3, 9.8, 2.2, -1.4, 5);      // GENE-O-MAT
-  accent(0x52f2ff, 3, 8.4, 3.4, -4.4, 6);      // tank
-  accent(0xff9ae2, 2.5, -6.2, 2.4, 2.4, 5);    // idea desk
+  // small practical colour spill only next to its real source (screens, a lightbox) — no room washes
+  const spill = (c: number, i: number, x: number, y: number, z: number, d = 3.2) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(x, y, z); group.add(l); return l; };
+  spill(0x9fe8c0, 1.4, 1.2, 1.9, -6.2);        // console screens
+  spill(0xffc8e8, 1.0, 10.4, 2.6, -1.4);       // GENE-O-MAT lightbox
+  // a warm spot on the painted sign
+  const signSpot = new THREE.SpotLight(0xffe0b0, 26, 9, 0.55, 0.5, 1.4);
+  signSpot.position.set(0, 7.2, -5.6); signSpot.target.position.set(0, 5.4, -7.9);
+  group.add(signSpot, signSpot.target);
 
   // ── space ─────────────────────────────────────────────────────────────────────
   const space = new THREE.Group(); space.name = 'space';
@@ -190,9 +196,9 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
   group.add(space);
 
   // ── lights ────────────────────────────────────────────────────────────────────
-  const hemi = new THREE.HemisphereLight(0x9ab8ff, 0x1a1420, 0.65);
+  const hemi = new THREE.HemisphereLight(0xb8c8e0, 0x2a2420, 0.7);
   group.add(hemi);
-  const key = new THREE.DirectionalLight(0xe8f0ff, 1.25);
+  const key = new THREE.DirectionalLight(0xfff0dc, 1.15);
   key.position.set(-8, 14, 12); key.target.position.set(0, 0, -1);
   key.castShadow = quality === 'high';
   if (key.castShadow) {
@@ -201,7 +207,7 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
     key.shadow.bias = -0.0006; key.shadow.normalBias = 0.02;
   }
   group.add(key, key.target);
-  const spaceLight = new THREE.DirectionalLight(0x7fd8ff, 0.9);
+  const spaceLight = new THREE.DirectionalLight(0x9fc8ff, 0.8);
   spaceLight.position.set(4, 4, -20); spaceLight.target.position.set(0, 0, 4);
   group.add(spaceLight, spaceLight.target);
 
@@ -212,11 +218,10 @@ export function buildEnvironment(scene: THREE.Scene, quality: 'low' | 'medium' |
     group, steamVents, lamps, hemi, arm, ufoLane: { y: 1, z: -30 },
     update(dt, t) {
       coreRings.children.forEach((r, i) => { r.position.y = (24 + i * 24) * U + Math.sin(t * 1.6 + i * 1.3) * 0.12; r.rotation.y += dt * (0.4 + i * 0.2); });
-      if (coreMat) { const k = 1.5 + Math.sin(t * 2.2) * 0.35; coreMat.color.setRGB(0.55 * k, 1.0 * k, 0.4 * k); }
-      coreLight.intensity = 4.5 + Math.sin(t * 2.2) * 1.2;
+      if (coreMat) { const k = 1.0 + Math.sin(t * 2.2) * 0.12; coreMat.color.setRGB(0.55 * k, 1.0 * k, 0.45 * k); }
+      coreLight.intensity = 2 + Math.sin(t * 2.2) * 0.4;
       lockWheel.rotation.z = Math.sin(t * 0.15) * 0.4;
-      { const k = 0.75 + Math.sin(t * 1.4) * 0.15; for (const m of floorGlowMats) (m as THREE.MeshBasicMaterial).color.setRGB(0.26 * k, 0.92 * k, 0.16 * k); }
-      for (const m of ribLightMats) (m as THREE.MeshBasicMaterial).color.setRGB(0.32 * 1.4, 0.95 * 1.4 * (0.8 + Math.sin(t * 0.8) * 0.2), 1.4);
+      { const k = 1.0 + Math.sin(t * 1.4) * 0.08; for (const m of floorGlowMats) (m as THREE.MeshBasicMaterial).color.setRGB(1.0 * k, 0.75 * k, 0.24 * k); }
       // robotic arm idles over the workbench, faster when the crew builds
       armT += dt;
       const upper = arm.getObjectByName('upper'), lower = arm.getObjectByName('lower'), hand = arm.getObjectByName('hand');

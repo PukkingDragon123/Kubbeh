@@ -35,6 +35,11 @@ const C: Record<string, any> = { shop: Shop, slot: SlotPanel, arcade: ArcadePane
   const q = new URLSearchParams(location.search);
   const panel = q.get('panel') ?? 'shop';
   (window as any).__h = { setPanel, unlock };
+  if (panel === 'idea' && q.has('doc')) {
+    const { newDoc, saveDoc } = await import('../ui/idea/doc');
+    const d = newDoc('Jelly Jump');
+    saveDoc({ ...d, pitch: 'A squishy alien bounces through a neon alley, sticking to walls.', genre: 'Platformer', pillars: ['Squishy physics', 'Short runs'], coreLoop: 'Jump → stick → absorb → grow', mechanics: [{ name: 'Wall stick', detail: 'Cling to walls for 2s' }], requirements: ['cat skin for the player'], completeness: 42 });
+  }
   const el = document.getElementById('harness')!;
   if (panel === 'widget') {
     el.style.cssText = 'position:fixed;left:12px;top:12px;width:360px;height:270px;border-radius:16px;overflow:hidden';

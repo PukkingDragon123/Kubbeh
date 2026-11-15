@@ -1,10 +1,7 @@
 // GLOB LABS — the living 3D voxel mothership lab deck. Boots the renderer, builds the ship,
 // and wires clicks, crew, furniture, UFOs and fuel alarms to the app's state and bus.
 import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { PixelPost, POST, setPost } from './post';
 import { studioEnvironment } from '../vox/mesh';
 import { bus, type SfxName } from '../core/bus';
 import { editMode, fuel, openPanelId, setPanel, settings } from '../core/state';
@@ -33,14 +30,15 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
   const q = settings.value.quality;
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: q !== 'low', powerPreference: 'high-performance', stencil: false });
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
   } catch (err) { throw new Error('WebGL is not available: ' + String((err as Error)?.message ?? err)); }
   if (!renderer.getContext()) throw new Error('WebGL context unavailable');
-  const dprCap = () => (settings.value.quality === 'high' ? 2 : settings.value.quality === 'medium' ? 1.5 : 1);
+  const dprCap = () => 2; // the final blit is cheap; the 3D renders at the low internal resolution
+  const lowRes = () => (settings.value.quality === 'high' ? 540 : settings.value.quality === 'medium' ? 440 : 360);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap()));
-  renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.0;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // tone mapping + sRGB happen in the pixel post pipeline (scene renders linear HDR)
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
   renderer.shadowMap.enabled = q === 'high';
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
@@ -82,28 +80,19 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
   const hemi: THREE.HemisphereLight | undefined = env.hemi;
   const hemiBase = hemi?.color.clone();
 
-  // post
-  let composer: EffectComposer | null = null;
-  let bloom: UnrealBloomPass | null = null;
-  const setupPost = () => {
-    composer?.dispose(); composer = null; bloom = null;
-    if (settings.value.quality === 'low') return;
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, rig.camera));
-    bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), settings.value.quality === 'high' ? 0.7 : 0.55, 0.5, 1.0);
-    composer.addPass(bloom);
-    composer.addPass(new OutputPass());
-    resize();
-  };
+  // post: the low-res pixel pipeline
+  const post = new PixelPost(renderer);
+  post.lowResH = lowRes();
+  setPost(post);
+  const setupPost = () => { post.setLowRes(lowRes()); };
 
   const resize = () => {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap()));
     renderer.setSize(w, h, false);
     rig.resize(w, h);
-    composer?.setSize(w, h);
-    composer?.setPixelRatio(renderer.getPixelRatio());
-    fx.setViewport(h * renderer.getPixelRatio(), rig.camera.fov);
+    post.setSize(w, h, renderer.getPixelRatio());
+    fx.setViewport(post.h, rig.camera.fov);
   };
   setupPost();
   resize();
@@ -254,9 +243,10 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
     // fuel alarm
     const tier = fuel.value.tier;
     const crit = tier === 'critical' || tier === 'empty';
-    alarm.intensity = crit ? (Math.sin(t * 6) * 0.5 + 0.5) * 30 : tier === 'quarter' ? (Math.sin(t * 3) * 0.5 + 0.5) * 6 : 0;
+    alarm.intensity = crit ? (Math.sin(t * 6) * 0.5 + 0.5) * 8 : tier === 'quarter' ? (Math.sin(t * 3) * 0.5 + 0.5) * 2 : 0;
     alarm.color.setHex(crit ? 0xff2a1a : 0xffa020);
-    if (hemi && hemiBase) hemi.color.copy(hemiBase).lerp(new THREE.Color(0x6a1a1a), crit ? 0.35 + Math.sin(t * 6) * 0.15 : 0);
+    POST.uAlarm.value = crit ? 0.25 + Math.sin(t * 6) * 0.2 : 0;
+    if (hemi && hemiBase) hemi.color.copy(hemiBase).lerp(new THREE.Color(0x6a1a1a), crit ? 0.2 + Math.sin(t * 6) * 0.1 : 0);
 
     // speech bubble anchor
     const sid = speakerId.value;
@@ -283,7 +273,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
       }));
     }
 
-    if (composer) composer.render(dt); else renderer.render(scene, rig.camera);
+    post.render(scene, rig.camera);
     if (!ready) { ready = true; bus.emit('world:ready', {}); }
   };
   loop();

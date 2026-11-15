@@ -35,8 +35,8 @@ function deck() {
       if (z > 11) return stripe ? 0xffbe3d : 0x1a1408;
       return seam ? 0x1b2422 : grain(0x2f3b38, x, y, z);
     }, M.metal);
-    // glowing floor strip
-    v.add(S.box([-46, -0.4, 9], [46, 0.2, 10]), 0x52f2ff, M.glow);
+    // painted floor guide line
+    v.add(S.box([-46, -0.4, 9], [46, 0.2, 10]), (x) => (Math.floor(x / 2) % 2 ? 0xd8e2e6 : 0x8a979c), M.solid);
     const back = VoxGrid.span([-48, 0, -16], [48, 34, -12], 1);
     back.add(S.box([-48, 0, -16], [48, 34, -12]), (x, y, z) => {
       const panel = Math.abs(((x + 48) % 16)) < 0.7 || Math.abs((y % 11)) < 0.7;
@@ -83,7 +83,7 @@ function stationModel(kind: keyof typeof STATION_X) {
       case 'vat':
         v.add(S.cyl(0, 0, 6.5, 0, 3), (x, y, z) => grain(0x4a525e, x, y, z), M.metal);
         v.add(S.cyl(0, 0, 6.5, 21, 24), (x, y, z) => grain(0x4a525e, x, y, z), M.metal);
-        v.add(S.cyl(0, 0, 5.4, 3, 17), (x, y) => mix(0x2f9a4a, 0x8cf56b, y / 17), M.glow);
+        v.add(S.cyl(0, 0, 5.4, 3, 17), (x, y) => mix(0x2f9a4a, 0x8cf56b, y / 17), M.solid);
         v.add(S.cyl(0, 0, 6, 3, 21), 0xa8f8ff, M.glass);
         v.add(S.ellipsoid([0, 9, 0], [2.4, 3, 2]), 0x2a6b3a, M.jelly);
         break;
@@ -191,16 +191,16 @@ export class WidgetScene {
   private t = 0;
 
   constructor(private canvas: HTMLCanvasElement, private win: Window) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    this.renderer.setPixelRatio(Math.min(2, win.devicePixelRatio || 1));
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
+    // pixel render: half resolution, nearest-neighbour upscaled by CSS (image-rendering: pixelated)
+    this.renderer.setPixelRatio(1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.scene.background = new THREE.Color('#0a1014');
     this.scene.environment = studioEnvironment(this.renderer);
     this.scene.add(new THREE.HemisphereLight('#e8fff4', '#22303a', 1.0));
     const key = new THREE.DirectionalLight('#fff2e0', 2.4); key.position.set(-3, 6, 6); this.scene.add(key);
-    const neon = new THREE.PointLight('#8cf56b', 6, 8); neon.position.set(-3, 1.5, 1.5); this.scene.add(neon);
-    const pink = new THREE.PointLight('#ff6fd6', 5, 8); pink.position.set(3, 1.5, 1.5); this.scene.add(pink);
+    const fill = new THREE.DirectionalLight('#a8c8ff', 0.7); fill.position.set(4, 2, 3); this.scene.add(fill);
 
     this.scene.add(deck());
     for (const k of Object.keys(STATION_X) as (keyof typeof STATION_X)[]) {
@@ -223,11 +223,11 @@ export class WidgetScene {
   resize() {
     const r = this.canvas.getBoundingClientRect();
     const w = Math.max(1, r.width), h = Math.max(1, r.height);
-    this.renderer.setSize(w, h, false);
+    this.renderer.setSize(Math.round(w / 2), Math.round(h / 2), false);
     this.cam.aspect = w / h;
     const tan = Math.tan(THREE.MathUtils.degToRad(this.cam.fov / 2));
     const dist = Math.max(1.32 / tan, 4.05 / (tan * this.cam.aspect));
-    this.cam.position.set(0.2, 1.55, dist); this.cam.lookAt(0.2, 0.95, 0); this.cam.updateProjectionMatrix();
+    this.cam.position.set(0.2, 2.6, dist); this.cam.lookAt(0.2, 0.62, 0); this.cam.updateProjectionMatrix();
   }
 
   private agentFor(m: CrewMember, lk: AlienLook | undefined, i: number): Agent | null {

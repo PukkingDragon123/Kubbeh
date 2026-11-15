@@ -1,13 +1,15 @@
-// <VoxView> — shows a real voxel model as UI art. A studio photo is rendered lazily (one
-// per frame, so a grid of 40 cards never stalls the UI) and cached by key; on hover (or
-// always, for hero views) the model comes alive in a live viewport: it turns, bobs and
-// squashes. Every icon-like thing in the shop / slots / badges / idea lab uses this.
+// <VoxView> — shows a real voxel model as pixel-finished UI art. The model is photographed
+// by the studio at low resolution (supersampled), given the pixel finish (posterise, 1 px ink
+// outline, warm rim) and shown at an exact integer upscale with crisp pixels. Stills are
+// rendered lazily (a few per frame so a grid of 40 never stalls) and cached by key; on hover
+// (or always, for hero views) the model comes alive and is re-finished every frame.
 import type { CSSProperties } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import type * as THREE from 'three';
-import { liveView, photo, type LiveView } from '../../../vox/studio';
+import { photo } from '../../../vox/studio';
 import { settings } from '../../../core/state';
 import { FRAME_COMP } from './models';
+import { pixelFinish } from './pixel';
 
 export type Spin = 'none' | 'hover' | 'always';
 
@@ -29,14 +31,32 @@ function pump() {
   setTimeout(step, 0);
 }
 
+// one shared animation loop for every live view
+type Live = { frame: (t: number, dt: number) => void; alive: () => boolean };
+const lives = new Set<Live>();
+let raf = 0, lastT = 0;
+function loop(now: number) {
+  raf = requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  for (const l of lives) {
+    if (!l.alive()) { lives.delete(l); continue; }
+    try { l.frame(now / 1000, dt); } catch (err) { console.warn('[voxview] live frame failed', err); lives.delete(l); }
+  }
+  if (!lives.size) { cancelAnimationFrame(raf); raf = 0; }
+}
+function addLive(l: Live) { lives.add(l); if (!raf) { lastT = performance.now(); raf = requestAnimationFrame(loop); } return () => { lives.delete(l); }; }
+
 export interface VoxViewProps {
   /** builds a FRESH object (wrap it with framed() for stable spins) */
   make: () => THREE.Object3D;
-  /** cache key for the still photo (include anything that changes the look) */
+  /** cache key for the still (include anything that changes the look) */
   cacheKey: string;
+  /** css size */
   size?: number;
   width?: number;
   height?: number;
+  /** integer pixel scale: each art pixel is px×px css pixels (default 2) */
+  px?: number;
   spin?: Spin;
   yaw?: number;
   pitch?: number;
@@ -51,48 +71,57 @@ export interface VoxViewProps {
   eager?: boolean;
 }
 
+const SS = 3;
+
 export function VoxView(p: VoxViewProps) {
   const ref = useRef<HTMLCanvasElement>(null);
   const objRef = useRef<THREE.Object3D | null>(null);
-  const live = useRef<LiveView | null>(null);
-  const w = p.width ?? p.size ?? 96, h = p.height ?? p.size ?? 96;
-  const dpr = Math.min(2, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1);
-  const W = Math.round(w * dpr), H = Math.round(h * dpr);
+  const stopLive = useRef<(() => void) | null>(null);
+  const px = Math.max(1, Math.round(p.px ?? 2));
+  const cw = p.width ?? p.size ?? 96, ch = p.height ?? p.size ?? 96;
+  const W = Math.max(8, Math.round(cw / px)), H = Math.max(8, Math.round(ch / px));
   const key = `${p.cacheKey}|${W}x${H}|${p.yaw ?? ''}|${p.pitch ?? ''}|${p.fill ?? ''}`;
   // makes are framed() (guard sphere): compensate for the studio's box-diagonal framing
-  const opts = { yaw: p.yaw ?? -0.5, pitch: p.pitch ?? 0.22, fill: (p.fill ?? 0.92) * FRAME_COMP };
+  const opts = { yaw: p.yaw ?? -0.5, pitch: p.pitch ?? 0.22, fill: (p.fill ?? 0.92) * FRAME_COMP, ss: 1 };
 
   const obj = () => (objRef.current ??= p.make());
 
   const drawStill = () => {
     const c = ref.current; if (!c) return;
     let shot = shots.get(key);
-    if (!shot) { shot = photo(obj(), W, H, opts); shots.set(key, shot); }
+    if (!shot) { shot = pixelFinish(photo(obj(), W * SS, H * SS, opts), W, H, SS); shots.set(key, shot); }
     const ctx = c.getContext('2d')!;
     ctx.clearRect(0, 0, W, H);
     ctx.drawImage(shot, 0, 0);
   };
 
   const startLive = () => {
-    const c = ref.current; if (!c || live.current) return;
+    const c = ref.current; if (!c || stopLive.current) return;
     if (settings.value.reduceMotion && p.spin !== 'always') return;
     const o = obj();
+    const scratch = document.createElement('canvas');
+    scratch.width = W * SS; scratch.height = H * SS;
     const base = o.rotation.y;
     let t0 = -1;
-    live.current = liveView(c, o, (t, dt) => {
-      if (t0 < 0) t0 = t;
-      const k = t - t0;
-      if (p.animate) p.animate(o, t, dt);
-      else {
-        o.rotation.y = base + Math.sin(k * 1.4) * 0.7 + k * 0.35;
-        const s = 1 + Math.sin(k * 6) * 0.015;
-        o.scale.set(1 / s, s, 1 / s);
-      }
-    }, { ...opts, ss: 1 });
+    stopLive.current = addLive({
+      alive: () => !!ref.current?.isConnected,
+      frame: (t, dt) => {
+        if (t0 < 0) t0 = t;
+        const k = t - t0;
+        if (p.animate) p.animate(o, t, dt);
+        else if (!settings.value.reduceMotion) {
+          o.rotation.y = base + Math.sin(k * 1.4) * 0.7 + k * 0.35;
+          const s = 1 + Math.sin(k * 6) * 0.015;
+          o.scale.set(1 / s, s, 1 / s);
+        }
+        photo(o, W * SS, H * SS, opts, scratch);
+        pixelFinish(scratch, W, H, SS, c);
+      },
+    });
   };
-  const stopLive = () => {
-    if (!live.current) return;
-    live.current.stop(); live.current = null;
+  const endLive = () => {
+    if (!stopLive.current) return;
+    stopLive.current(); stopLive.current = null;
     const o = objRef.current;
     if (o) { o.rotation.y = 0; o.scale.set(1, 1, 1); }
     drawStill();
@@ -100,18 +129,16 @@ export function VoxView(p: VoxViewProps) {
 
   useEffect(() => {
     objRef.current = null;
-    const c = ref.current!;
     const job: Job = { run: () => { drawStill(); if (p.spin === 'always') startLive(); }, alive: () => !!ref.current?.isConnected };
     if (shots.has(key) && p.spin !== 'always') drawStill();
     else { if (p.eager) queue.unshift(job); else queue.push(job); pump(); }
-    void c;
-    return () => { live.current?.stop(); live.current = null; };
+    return () => { stopLive.current?.(); stopLive.current = null; };
   }, [key]);
 
   return (
     <canvas ref={ref} width={W} height={H} class={`voxview ${p.class ?? ''}`} role="img" aria-label={p.alt ?? p.title ?? ''} title={p.title}
-      style={{ width: `${w}px`, height: `${h}px`, ...(p.style ?? {}) }}
+      style={{ width: `${W * px}px`, height: `${H * px}px`, imageRendering: 'pixelated', ...(p.style ?? {}) }}
       onPointerEnter={() => { if (p.spin === 'hover') startLive(); }}
-      onPointerLeave={() => { if (p.spin === 'hover') stopLive(); }} />
+      onPointerLeave={() => { if (p.spin === 'hover') endLive(); }} />
   );
 }

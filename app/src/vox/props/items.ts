@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { M, S, VoxGrid, mix, shade, smoothUnion, hash3, type V3 } from '../core';
 import { PAL, U, grid, mesh, plate, hazard, stampText, textWidth, glowMat, vgrad } from './kit';
+import { T } from '../tex';
 
 export interface ItemMeta {
   w: number; d: number;
@@ -27,12 +28,12 @@ export const ITEM_META: Record<string, ItemMeta> = {
   shelf: { w: 1, d: 1 },
   rug: { w: 2, d: 2, walkable: true },
   stool: { w: 1, d: 1, hang: [{ x: 0, z: 0, face: 0, anim: 'sit' }] },
-  neon_heart: { w: 1, d: 1, light: [0xff6fd6, 4, 1.6] },
-  neon_ufo: { w: 1, d: 1, light: [0x52f2ff, 4, 1.8] },
+  neon_heart: { w: 1, d: 1, light: [0xff6fd6, 1.8, 1.6] },
+  neon_ufo: { w: 1, d: 1, light: [0x52f2ff, 1.8, 1.8] },
   poster: { w: 1, d: 1 },
   graffiti: { w: 1, d: 1 },
-  lava_lamp: { w: 1, d: 1, light: [0x8cf56b, 2, 0.9] },
-  disco: { w: 1, d: 1, light: [0xffffff, 3, 2.2] },
+  lava_lamp: { w: 1, d: 1, light: [0x8cf56b, 0.9, 0.9] },
+  disco: { w: 1, d: 1, light: [0xffffff, 1.35, 2.2] },
   traffic_cone: { w: 1, d: 1 },
   trash_can: { w: 1, d: 1 },
   gnome: { w: 1, d: 1 },
@@ -40,22 +41,22 @@ export const ITEM_META: Record<string, ItemMeta> = {
   eyeplant: { w: 1, d: 1 },
   cactus: { w: 1, d: 1 },
   tentacle_fern: { w: 1, d: 1 },
-  shroom: { w: 1, d: 1, light: [0x52f2ff, 1.6, 0.6] },
-  tesla: { w: 1, d: 1, light: [0xb48cff, 2, 2.2] },
+  shroom: { w: 1, d: 1, light: [0x52f2ff, 0.72, 0.6] },
+  tesla: { w: 1, d: 1, light: [0xb48cff, 0.9, 2.2] },
   microscope: { w: 1, d: 1 },
   jars: { w: 1, d: 1 },
   brain_tank: { w: 1, d: 1 },
-  teleporter: { w: 1, d: 1, hang: [{ x: 0, z: 0, face: 0, anim: 'wave' }], light: [0x52f2ff, 2.5, 0.6] },
+  teleporter: { w: 1, d: 1, hang: [{ x: 0, z: 0, face: 0, anim: 'wave' }], light: [0x52f2ff, 1.12, 0.6] },
   server_rack: { w: 1, d: 1 },
   generator: { w: 1, d: 1 },
   slot_machine: { w: 1, d: 1, panel: 'slot', hang: [{ x: 0, z: 0.95, face: Math.PI, anim: 'play' }] },
   arcade_cab: { w: 1, d: 1, panel: 'arcade', hang: [{ x: 0, z: 0.95, face: Math.PI, anim: 'play' }] },
   pinball: { w: 1, d: 2, hang: [{ x: 0, z: 1.25, face: Math.PI, anim: 'play' }] },
-  jukebox: { w: 1, d: 1, hang: [{ x: 0, z: 0.95, face: Math.PI, anim: 'jump' }], light: [0xff6fd6, 2.5, 1.4] },
+  jukebox: { w: 1, d: 1, hang: [{ x: 0, z: 0.95, face: Math.PI, anim: 'jump' }], light: [0xff6fd6, 1.12, 1.4] },
   claw: { w: 1, d: 1, hang: [{ x: 0, z: 0.95, face: Math.PI, anim: 'play' }] },
-  string_lights: { w: 2, d: 1, light: [0xffd38a, 2.5, 2.2] },
-  lamp_floor: { w: 1, d: 1, light: [0xffc77a, 4, 1.7] },
-  neon_tube: { w: 1, d: 1, light: [0xb48cff, 3.5, 1.3] },
+  string_lights: { w: 2, d: 1, light: [0xffd38a, 1.12, 2.2] },
+  lamp_floor: { w: 1, d: 1, light: [0xffc77a, 1.8, 1.7] },
+  neon_tube: { w: 1, d: 1, light: [0xb48cff, 1.57, 1.3] },
 };
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -92,6 +93,7 @@ function beanbag() {
 
 function couch() {
   const g = grid([-16, 0, -8], [16, 18, 8], 2);
+  g.tex(T.fabric);
   const fabric = (x: number, y: number, z: number) => {
     const quilt = (Math.floor(x / 3) + Math.floor(y / 3)) % 2 === 0;
     return quilt ? 0x7a2f5a : 0x8a3866;
@@ -109,6 +111,7 @@ function couch() {
 
 function workbench() {
   const g = grid([-16, 0, -8], [16, 28, 8], 2);
+  g.tex(T.wood);
   g.add(S.box([-15, 11, -7], [15, 13, 7]), (x, y, z) => plate(PAL.wood, x + 16, z + 8, { pw: 6, ph: 30, bolt: false }), M.solid);
   for (const sx of [-1, 1]) g.add(S.box([sx * 13 - 1.2, 0, -6], [sx * 13 + 1.2, 11, 6]), PAL.steelDark, M.metal);
   g.add(S.box([-13, 3, -6], [13, 4, 6]), PAL.steelDark, M.metal);
@@ -123,6 +126,7 @@ function workbench() {
 
 function shelf() {
   const g = grid([-8, 0, -8], [8, 34, 8], 2);
+  g.tex(T.hull);
   for (const sx of [-1, 1]) g.add(S.box([sx * 7 - 0.8, 0, -6], [sx * 7 + 0.8, 33, -1]), PAL.steelDark, M.metal);
   for (const y of [1, 11, 21, 31]) g.add(S.box([-7, y, -6], [7, y + 1.2, -1]), PAL.steel, M.metal);
   const jar = (x: number, y: number, liquid: number, thing: number) => {
@@ -141,6 +145,7 @@ function shelf() {
 
 function rug() {
   const g = grid([-16, 0, -16], [16, 1.2, 16], 2);
+  g.tex(T.fabric);
   g.add(S.cyl(0, 0, 15.5, 0, 0.8), (x, _y, z) => {
     const r = Math.hypot(x, z), a = Math.atan2(z, x);
     if (r > 14.6) return 0x5c3a24;
@@ -154,6 +159,7 @@ function rug() {
 
 function stool() {
   const g = grid([-6, 0, -6], [6, 14, 6], 3);
+  g.tex(T.paint);
   for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; g.add(S.capsule([Math.cos(a) * 4.6, 0, Math.sin(a) * 4.6], [Math.cos(a) * 2, 11, Math.sin(a) * 2], 0.7), PAL.steel, M.metal); }
   g.add(S.torus([0, 5, 0], [0, 1, 0], 3.4, 0.4), PAL.steelDark, M.metal);
   g.add(S.cyl(0, 0, 4.6, 11, 13), (x, _y, z) => (Math.hypot(x, z) > 4 ? PAL.steelDark : (Math.hypot(x, z) < 0.9 ? PAL.chrome : PAL.paintRed)), M.metal);
@@ -168,6 +174,7 @@ function signStand(g: VoxGrid, h = 26) {
 function neonHeart() {
   const root = new THREE.Group();
   const g = grid([-9, 0, -5], [9, 34, 5], 3);
+  g.tex(T.hull);
   signStand(g, 18);
   g.add(S.box([-8.5, 17, -1.4], [8.5, 33, -0.4], 0.6), 0x1a1220, M.solid);       // backboard
   for (let i = 0; i < 64; i++) {
@@ -188,6 +195,7 @@ function swapGlow(o: THREE.Object3D, mat: THREE.Material, name: string) {
 function neonUfo() {
   const root = new THREE.Group();
   const g = grid([-10, 0, -5], [10, 36, 5], 3);
+  g.tex(T.hull);
   signStand(g, 18);
   g.add(S.box([-9.5, 17, -1.4], [9.5, 35, -0.4], 0.6), 0x101a22, M.solid);
   root.add(mesh(g));
@@ -201,6 +209,7 @@ function neonUfo() {
 }
 function poster() {
   const g = grid([-8, 0, -4], [8, 34, 4], 4);
+  g.tex(T.wood);
   for (const sx of [-1, 1]) g.add(S.capsule([sx * 6, 0, 0], [sx * 6, 31, -1.6], 0.6), PAL.wood, M.solid);
   g.add(S.box([-7, 10, -2.2], [7, 31, -1.2]), PAL.woodDark, M.solid);
   g.add(S.box([-6.2, 10.8, -1.4], [6.2, 30.2, -0.8]), (x, y) => mix(0xefe2b8, 0xd8c690, (Math.sin(x * 0.7) + Math.sin(y * 0.5)) * 0.1 + 0.2), M.solid);
@@ -214,6 +223,7 @@ function poster() {
 }
 function graffiti() {
   const g = grid([-8, 0, -3], [8, 32, 3], 2);
+  g.tex(T.hull);
   g.add(S.box([-7.6, 0, -2], [7.6, 31, 0]), (x, y) => plate(PAL.hullDark, x + 8, y, { pw: 16, ph: 15.5 }), M.metal);
   for (const sx of [-1, 1]) g.add(S.box([sx * 7 - 1, 0, -3], [sx * 7 + 1, 2, 3]), PAL.hullDeep, M.metal);
   // spray tag: an alien head + ZIB♥
@@ -228,6 +238,7 @@ function graffiti() {
 function lavaLamp() {
   const root = new THREE.Group();
   const g = grid([-5, 0, -5], [5, 26, 5], 3);
+  g.tex(T.pipe);
   g.add(S.cone(0, 0, 0, 7, 4.2, 2.6), PAL.chrome, M.metal);
   g.add(S.cone(0, 0, 7, 20, 2.6, 3.2), PAL.glass, M.glass);
   g.add(S.cone(0, 0, 20, 24, 3.2, 1.6), PAL.chrome, M.metal);
@@ -246,6 +257,7 @@ function lavaLamp() {
 function disco() {
   const root = new THREE.Group();
   const g = grid([-6, 0, -6], [6, 42, 6], 2);
+  g.tex(T.hull);
   g.add(S.cyl(0, 0, 5, 0, 1.5), PAL.hullDark, M.metal);
   g.add(S.capsule([0, 1.5, 0], [0, 40, 0], 0.7), PAL.steelDark, M.metal);
   g.add(S.capsule([0, 40, 0], [5, 40, 0], 0.6), PAL.steelDark, M.metal);
@@ -261,12 +273,14 @@ function disco() {
 }
 function trafficCone() {
   const g = grid([-6, 0, -6], [6, 16, 6], 3);
+  g.tex(T.worn);
   g.add(S.box([-5.5, 0, -5.5], [5.5, 1, 5.5], 0.6), 0xd8601f, M.solid);
   g.add(S.cone(0, 0, 1, 15, 4.2, 0.9), (_x, y) => ((y > 5 && y < 7) || (y > 10 && y < 11.5) ? 0xf4f4f0 : 0xf07a28), M.solid);
   return mesh(g);
 }
 function trashCan() {
   const g = grid([-7, 0, -7], [7, 20, 7], 2);
+  g.tex(T.pipe);
   g.add(S.cyl(0, 0, 5.4, 0, 13), (x, y, z) => (Math.floor(Math.atan2(z, x) * 8 / Math.PI) % 2 ? PAL.steelDark : PAL.steel), M.metal);
   g.add(S.torus([0, 13, 0], [0, 1, 0], 5.4, 0.7), PAL.steel, M.metal);
   g.add(S.cyl(0, 0, 4.8, 12, 14), 0x222222, M.solid);
@@ -296,6 +310,7 @@ function gnome() {
 function chomper() {
   const root = new THREE.Group();
   const g = grid([-7, 0, -7], [7, 20, 7], 2);
+  g.tex(T.pipe);
   pot(g, 5, 7, 0x8a4a3a);
   g.add(S.capsule([0, 6, 0], [1, 13, 0.5], 1), 0x3f8a3a, M.jelly);
   for (const sx of [-1, 1]) g.add(S.ellipsoid([sx * 3.4, 9, 0], [3, 0.8, 1.6]), 0x4fa84a, M.jelly);
@@ -317,6 +332,7 @@ function chomper() {
 function eyeplant() {
   const root = new THREE.Group();
   const g = grid([-7, 0, -7], [7, 22, 7], 2);
+  g.tex(T.pipe);
   pot(g, 5, 7, 0x6a3a8a);
   g.add(S.capsule([0, 6, 0], [-1, 11, 0], 0.9), 0x5f8a3a, M.jelly);
   g.add(S.capsule([-1, 11, 0], [0.5, 16, 0], 0.8), 0x5f8a3a, M.jelly);
@@ -338,6 +354,7 @@ function eyeplant() {
 }
 function cactus() {
   const g = grid([-7, 0, -7], [7, 26, 7], 3);
+  g.tex(T.pipe);
   pot(g, 4.6, 6, 0xc8a46a);
   const green = (x: number, _y: number, z: number) => (Math.floor(Math.atan2(z, x) * 5 / Math.PI) % 2 ? 0x3f8f4a : 0x4fa85a);
   g.add(S.capsule([0, 5, 0], [0, 21, 0], 2.6), green, M.jelly);
@@ -350,6 +367,7 @@ function cactus() {
 function tentacleFern() {
   const root = new THREE.Group();
   const g = grid([-7, 0, -7], [7, 8, 7], 2);
+  g.tex(T.pipe);
   pot(g, 5.4, 7, 0x2a6a8a);
   root.add(mesh(g));
   for (let i = 0; i < 6; i++) {
@@ -379,6 +397,7 @@ function shroom() {
 function tesla() {
   const root = new THREE.Group();
   const g = grid([-7, 0, -7], [7, 38, 7], 2);
+  g.tex(T.hull);
   g.add(S.box([-6.5, 0, -6.5], [6.5, 4, 6.5], 0.8), (x, y, z) => (y < 1.2 ? hazard(x + z, y * 3, 2.5) : PAL.hullDark), M.metal);
   g.add(S.cyl(0, 0, 2.6, 4, 28), (_x, y) => (Math.floor(y * 2) % 2 ? 0xc87a3a : 0xa85a2a), M.metal);   // copper coil windings
   for (const y of [8, 16, 24]) g.add(S.torus([0, y, 0], [0, 1, 0], 3.4, 0.5), 0xd8d8e0, M.solid);
@@ -391,6 +410,7 @@ function tesla() {
 }
 function microscope() {
   const g = grid([-7, 0, -7], [7, 24, 7], 3);
+  g.tex(T.paint);
   g.add(S.box([-6, 0, -5], [6, 2, 6], 0.8), PAL.paintCream, M.solid);
   g.add(S.capsule([0, 2, -3.5], [0, 15, -3.5], 1.6), PAL.paintCream, M.solid);          // arm
   g.add(S.box([-4, 7, -2], [4, 8, 4], 0.4), PAL.hullDark, M.metal);                       // stage
@@ -405,6 +425,7 @@ function microscope() {
 }
 function jars() {
   const g = grid([-8, 0, -6], [8, 26, 6], 3);
+  g.tex(T.wood);
   g.add(S.box([-7.5, 0, -5], [7.5, 2, 5], 0.6), PAL.woodDark, M.solid);
   g.add(S.box([-7.5, 12, -5], [7.5, 13.4, 5], 0.4), PAL.woodDark, M.solid);
   for (const sx of [-1, 1]) g.add(S.box([sx * 7 - 0.6, 0, -1], [sx * 7 + 0.6, 13, 1]), PAL.woodDark, M.solid);
@@ -424,6 +445,7 @@ function jars() {
 function brainTank() {
   const root = new THREE.Group();
   const g = grid([-7, 0, -7], [7, 30, 7], 2);
+  g.tex(T.hull);
   g.add(S.cyl(0, 0, 6, 0, 5), (x, y, z) => (y > 3.6 ? PAL.steel : plate(PAL.hullDark, Math.atan2(z, x) * 6, y, { pw: 3, ph: 10, bolt: false })), M.metal);
   for (let i = 0; i < 4; i++) g.add(S.sphere([Math.cos(i * 1.57) * 6, 2.5, Math.sin(i * 1.57) * 6], 0.6), [PAL.glob, PAL.pink, PAL.cyan, PAL.amber][i], M.glow);
   g.add(S.cyl(0, 0, 5.2, 5, 25), PAL.glass, M.glass);
@@ -441,6 +463,7 @@ function brainTank() {
 function teleporter() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -8], [8, 6, 8], 2);
+  g.tex(T.worn);
   g.add(S.cyl(0, 0, 7.6, 0, 2.4), (x, _y, z) => { const r = Math.hypot(x, z), a = Math.atan2(z, x); if (r > 6.8) return Math.floor(a * 8 / Math.PI) % 2 ? PAL.hazardY : PAL.hazardK; return PAL.hullDark; }, M.metal);
   g.add(S.cyl(0, 0, 5.6, 2.4, 3), (x, _y, z) => (Math.abs(Math.hypot(x, z) - 3.6) < 0.5 || Math.hypot(x, z) < 1.2 ? 0xffffff : 0x1d3a4a), M.glow);
   for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; g.add(S.box([Math.cos(a) * 6 - 0.8, 2.4, Math.sin(a) * 6 - 0.8], [Math.cos(a) * 6 + 0.8, 5.4, Math.sin(a) * 6 + 0.8], 0.3), PAL.steel, M.metal); g.add(S.sphere([Math.cos(a) * 6, 5.8, Math.sin(a) * 6], 0.7), 0xffffff, M.glow); }
@@ -453,6 +476,7 @@ function teleporter() {
 function serverRack() {
   const root = new THREE.Group();
   const g = grid([-7, 0, -7], [7, 38, 7], 2);
+  g.tex(T.console);
   g.add(S.box([-6.5, 0, -6], [6.5, 37, 6], 0.5), PAL.hullDeep, M.metal);
   for (let r = 0; r < 9; r++) {
     const y = 2 + r * 3.8;
@@ -467,6 +491,7 @@ function serverRack() {
 function generator() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -8], [8, 28, 8], 2);
+  g.tex(T.hull);
   g.add(S.box([-7.5, 0, -6], [7.5, 2, 6], 0.6), (x, y, z) => (y < 0.8 ? hazard(x, z, 3) : PAL.hullDark), M.metal);
   for (const sx of [-1, 1]) g.add(S.box([sx * 6.6 - 0.8, 2, -1], [sx * 6.6 + 0.8, 16, 1]), PAL.steel, M.metal);
   g.add(S.box([4, 2, 2.6], [7.5, 9, 6], 0.6), PAL.paintTeal, M.metal);                   // battery box
@@ -496,6 +521,7 @@ function cabinetShell(g: VoxGrid, body: number, trim: number, h = 30) {
 function slotMachine() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -8], [10, 34, 9], 2);
+  g.tex(T.paint);
   cabinetShell(g, 0xc8302a, 0xf2c043, 30);
   g.add(S.box([-6.6, 30, -6], [6.6, 33, 5.6], 1), 0xf2c043, M.metal);                     // crown
   for (let i = 0; i < 7; i++) g.add(S.sphere([-5.4 + i * 1.8, 31.6, 5.6], 0.6), 0xffffff, M.glow);
@@ -520,6 +546,7 @@ function slotMachine() {
 function arcadeCab() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -8], [8, 34, 10], 2);
+  g.tex(T.paint);
   cabinetShell(g, 0x3a2a7a, 0x52f2ff, 32);
   g.add(S.box([-7, 28.5, 4], [7, 32, 6.8], 0.6), 0x1a1240, M.solid);                       // marquee
   g.add(S.capsule([-3, 16, 6], [-3, 18, 6.4], 0.4), PAL.hullDeep, M.metal);                 // joystick
@@ -544,6 +571,7 @@ function arcadeCab() {
 function pinball() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -16], [8, 30, 16], 2);
+  g.tex(T.paint);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(S.box([sx * 6 - 0.8, 0, sz * 13 - 0.8], [sx * 6 + 0.8, sz > 0 ? 12 : 15, sz * 13 + 0.8]), PAL.chrome, M.metal);
   const top = (z: number) => 13 + (14 - z) * 0.1;
   for (let z = -15; z < 15; z += 0.5) g.add(S.box([-7.5, top(z) - 2.4, z], [7.5, top(z), z + 0.5]), (x, y) => (Math.abs(x) > 6.8 ? 0x8a3fd8 : y > top(z) - 0.6 ? 0x1a1240 : 0x6a2fb0), M.solid);
@@ -559,6 +587,7 @@ function pinball() {
 function jukebox() {
   const root = new THREE.Group();
   const g = grid([-9, 0, -7], [9, 32, 8], 2);
+  g.tex(T.wood);
   g.add(smoothUnion(S.box([-8, 0, -6], [8, 22, 6], 1), S.ellipsoid([0, 22, 0], [8, 9, 6]), 1), (x, y) => (Math.abs(x) > 7 ? 0xc87a3a : y < 2 ? 0x5a3a1a : 0x7a4a2a), M.solid);
   g.add(S.box([-5.6, 3, 5.4], [5.6, 11, 6.4]), (x, y) => ((Math.floor(x * 1.5) + Math.floor(y * 1.5)) % 2 ? 0x2a1a10 : 0x4a2a1a), M.solid);    // speaker grille
   g.add(S.box([-5, 13, 5.6], [5, 19, 6.6]), 0xfff2c8, M.glow);                            // song cards
@@ -573,6 +602,7 @@ function jukebox() {
 function clawMachine() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -8], [8, 38, 8], 2);
+  g.tex(T.paint);
   g.add(S.box([-7.5, 0, -7.5], [7.5, 12, 7.5], 1), (x, y) => (y > 10.5 ? 0xffe14d : Math.abs(x) > 6.8 ? 0xd84aaf : 0xff6fd6), M.solid);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(S.box([sx * 7 - 0.6, 12, sz * 7 - 0.6], [sx * 7 + 0.6, 34, sz * 7 + 0.6]), 0xff6fd6, M.solid);
   g.add(S.box([-7.5, 34, -7.5], [7.5, 37, 7.5], 0.8), 0xd84aaf, M.solid);
@@ -593,6 +623,7 @@ function clawMachine() {
 function stringLights() {
   const root = new THREE.Group();
   const g = grid([-16, 0, -2], [16, 40, 2], 2);
+  g.tex(T.wood);
   for (const sx of [-1, 1]) { g.add(S.box([sx * 14 - 0.7, 0, -0.7], [sx * 14 + 0.7, 38, 0.7]), PAL.woodDark, M.solid); g.add(S.box([sx * 14 - 3, 0, -2], [sx * 14 + 3, 1.4, 2], 0.4), PAL.hullDark, M.metal); }
   for (let i = 0; i <= 40; i++) { const x = -14 + (i / 40) * 28, y = 37 - Math.sin((i / 40) * Math.PI) * 8; g.add(S.sphere([x, y, 0], 0.35), 0x1a1a1a, M.solid); }
   root.add(mesh(g));
@@ -604,6 +635,7 @@ function stringLights() {
 function lampFloor() {
   const root = new THREE.Group();
   const g = grid([-8, 0, -6], [10, 32, 6], 2);
+  g.tex(T.paint);
   g.add(S.cyl(0, 0, 4.4, 0, 1.4), (x, _y, z) => hazard(Math.atan2(z, x) * 4, 0, 1.5), M.metal);
   g.add(S.capsule([0, 1.4, 0], [0, 28, 0], 0.7), PAL.steelDark, M.metal);
   g.add(S.capsule([0, 28, 0], [6, 29, 0], 0.6), PAL.steelDark, M.metal);
@@ -617,6 +649,7 @@ function lampFloor() {
 function neonTube() {
   const root = new THREE.Group();
   const g = grid([-5, 0, -5], [5, 30, 5], 3);
+  g.tex(T.hull);
   g.add(S.box([-3.6, 0, -3.6], [3.6, 2.4, 3.6], 0.6), PAL.hullDark, M.metal);
   g.add(S.cyl(0, 0, 1.2, 2.4, 4), PAL.steel, M.metal);
   g.add(S.cyl(0, 0, 1.2, 27, 28.4), PAL.steel, M.metal);

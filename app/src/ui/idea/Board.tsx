@@ -9,6 +9,7 @@ import { Icon } from '../common/icons';
 import { VoxView } from '../shop/vox/VoxView';
 import { framed } from '../shop/vox/models';
 import { buildGlyph, type GlyphName } from '../shop/vox/glyphs';
+import { pixelBurst } from '../shop/vox/pixel';
 import { SECTIONS, applyPatch, coverage, docAsBrief, fill, saveDoc, type Section } from './doc';
 import { FAMILY_COLOR, MECHANICS, type Family, type Mechanic } from './mechanics';
 import { DETAIL_LEVELS, TARGETS, finalPromptSystem, type Target } from './prompts';
@@ -130,7 +131,7 @@ export function MixerTab({ doc, onFuse }: { doc: DesignDoc; onFuse: (picked: Mec
           {picked.map((m) => <span key={m.name} class="slot" style={{ ['--fam' as any]: FAMILY_COLOR[m.family] }}><FamilyGlyph family={m.family} size={26} />{m.name}<button type="button" class="btn ghost sm icon" style={{ minHeight: '20px', width: '20px', borderRadius: '6px' }} aria-label={`Remove ${m.name}`} onClick={() => toggle(m)}><Icon name="close" size="sm" /></button></span>)}
         </div>
         <div class="row wrap gap-8" style={{ position: 'relative', zIndex: 1, marginTop: 'auto' }}>
-          <Btn tone="glob" icon="bolt" disabled={picked.length < 2} onClick={() => { sfx('zap', .5); setHot((h) => h + 1); unlock('fusion'); onFuse(picked); setPicked([]); }}>Fuse with Glorp</Btn>
+          <Btn tone="glob" icon="bolt" disabled={picked.length < 2} onClick={() => { sfx('zap', .5); setHot((h) => h + 1); const fc = document.querySelector('.fusion'); if (fc) pixelBurst(fc as HTMLElement, 'bubbles'); unlock('fusion'); onFuse(picked); setPicked([]); }}>Fuse with Glorp</Btn>
           <Btn tone="ghost" icon="plus" disabled={!picked.length} onClick={() => {
             const { doc: n } = applyPatch(doc, { mechanics: picked.map((m) => ({ name: m.name, detail: m.blurb })) });
             saveDoc(n); sfx('bling', .4); toast(`Added ${picked.length} mechanic${picked.length > 1 ? 's' : ''} to the doc`, 'good'); setPicked([]);

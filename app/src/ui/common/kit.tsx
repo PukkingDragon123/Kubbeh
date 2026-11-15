@@ -98,7 +98,7 @@ export function Meter({ value, tone }: { value: number; tone?: 'warn' | 'crit' }
 }
 
 export function Empty({ icon = 'alien', title, children }: { icon?: IconName; title: string; children?: ComponentChildren }) {
-  const url = iconURL(icon, 96);
+  const url = iconURL(icon, 96); // 48 art px shown 2×
   return (
     <div class="empty">
       {url ? <img class="ico vx" src={url} width={96} height={96} alt="" aria-hidden="true" draggable={false} /> : <Icon name={icon} size="xl" />}

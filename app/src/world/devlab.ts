@@ -1,10 +1,7 @@
 // Ship dev scenes for the voxel lab page: ship:deck (full deck from the home camera),
 // ship:close (a crew close-up), ship:tank, ship:console. Renders a few frames then stops.
 import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { PixelPost, setPost } from './post';
 import { buildEnvironment } from './env';
 import { buildStations } from './stations';
 import { Particles } from './particles';
@@ -60,10 +57,14 @@ export async function runShipLab(mode: string, r: THREE.WebGLRenderer, scene: TH
   else if (mode === 'window') setCam(new THREE.Vector3(0, 3.5, -8), 12, 0, 1.45);
   else setCam(home.target, home.radius, home.theta, home.phi);
 
-  const composer = new EffectComposer(r);
-  composer.addPass(new RenderPass(scene, cam));
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.5, 1.0));
-  composer.addPass(new OutputPass());
+  r.toneMapping = THREE.NoToneMapping;
+  r.outputColorSpace = THREE.LinearSRGBColorSpace;
+  r.setPixelRatio(1);
+  const post = new PixelPost(r);
+  post.lowResH = q.has('res') ? +q.get('res')! : 440;
+  post.setSize(innerWidth, innerHeight, 1);
+  setPost(post);
+  fx.setViewport(post.h, cam.fov);
   r.shadowMap.enabled = true;
   let n = 0, t = 3;
   r.setAnimationLoop(() => {
@@ -73,7 +74,7 @@ export async function runShipLab(mode: string, r: THREE.WebGLRenderer, scene: TH
     for (const a of aliens) a.update(dt, t);
     for (const u of ufos) u.update(dt, t, fx);
     fx.setCamera(cam); fx.update(dt, t);
-    composer.render(dt);
+    post.render(scene, cam);
     if (++n > 2) { r.setAnimationLoop(null); (window as any).__voxlabDone = true; }
   });
   // triangle budget report (instanced meshes count every instance)

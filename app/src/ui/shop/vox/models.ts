@@ -67,10 +67,12 @@ export function pedestal(rarity: CatalogItem['rarity']): THREE.Object3D {
       const base = rim ? 0x3c4a46 : 0x2b3632;
       return shade(base, 0.92 + hash3(x | 0, y | 0, z | 0) * 0.1 + (y > -2 ? 0.12 : 0));
     }, M.metal);
-    v.add(S.torus([0, -1.6, 0], [0, 1, 0], 11.2, 0.9), glow, M.glow);
+    // painted rarity band around the rim + small gem lamps (no glow halo)
+    v.add(S.torus([0, -1.6, 0], [0, 1, 0], 11.4, 0.85), (x, _y, z) => shade(glow, 0.85 + hash3(x | 0, 1, z | 0) * 0.15), M.solid);
     v.add(S.disc([0, -0.6, 0], [0, 1, 0], 9.6, 0.6, 6, Math.PI / 6), (x, y, z) => mix(0x1a2420, 0x24302b, hash3(x | 0, 0, z | 0)), M.metal);
     for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + Math.PI / 6; v.add(S.sphere([Math.cos(a) * 12, -4, Math.sin(a) * 12], 1), 0xa8b4bc, M.metal); }
-    if (rarity === 'legendary' || rarity === 'epic') for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; v.add(S.sphere([Math.cos(a) * 12.6, -6.3, Math.sin(a) * 12.6], 0.7), glow, M.glow); }
+    const gems = rarity === 'legendary' ? 6 : rarity === 'epic' ? 4 : rarity === 'rare' ? 2 : 0;
+    for (let i = 0; i < gems; i++) { const a = (i / gems) * Math.PI * 2 + Math.PI / 6; v.add(S.box([Math.cos(a) * 12.9 - 0.7, -5, Math.sin(a) * 12.9 - 0.7], [Math.cos(a) * 12.9 + 0.7, -3.6, Math.sin(a) * 12.9 + 0.7]), glow, M.glow); }
     p = toObject(v, { size: 0.04, name: 'pedestal' });
     // the grid's top is y=1 → place top at 0
     p.position.y = -0.04;
@@ -89,7 +91,7 @@ function crate(id: string, color: number): THREE.Object3D {
       const edge = Math.abs(x) > 7 || Math.abs(z) > 7 || y > 16 || y < 2;
       return edge ? shade(0x8a6a3e, 0.9 + hash3(x | 0, y | 0, z | 0) * 0.15) : shade(0xb8925a, 0.92 + hash3(x | 0, y | 0, z | 0) * 0.12);
     }, M.solid);
-    v.add(S.box([-5, 5, 8.5], [5, 13, 9.8], 0.5), color, M.glow);
+    v.add(S.box([-5, 5, 8.5], [5, 13, 9.8], 0.5), color, M.solid);
     c = toObject(v, { size: 0.045, anchor: 'bottom', outline: 0x1a120a });
     crateCache.set(id, c);
   }

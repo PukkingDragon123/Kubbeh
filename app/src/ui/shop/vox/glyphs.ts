@@ -1,6 +1,7 @@
 // Voxel glyph library — little sculpted 3D symbols used on slot reels, medals and
-// mechanic cards. Each glyph is a real voxel object with an inked outline (same family as
-// the aliens), tinted by a colour; `gold` turns it into polished gold with glints.
+// mechanic cards. Each glyph is a real voxel object, matte and painted (no emissive glow),
+// tinted by a colour; `gold` turns it into gold with painted glints. The UI shows them
+// through the pixel finish (see pixel.ts).
 import * as THREE from 'three';
 import { M, S, VoxGrid, hash3, mix, shade, type V3 } from '../../../vox/core';
 import { toObject } from '../../../vox/mesh';
@@ -31,10 +32,10 @@ const SCULPT: Record<GlyphName, Sculpt> = {
   },
   play: (v, c, m) => { for (let y = -10; y <= 10; y++) { const w = 10 - Math.abs(y); v.add(S.box([-7, y, -3], [-7 + w * 1.6 + 0.6, y + 1, 3], 0.4), tone(c), m); } },
   idea: (v, c, m) => {
-    v.add(S.sphere([0, 3, 0], 9), (x, y) => (y > 8 && x < -2 ? 0xfffbe0 : mix(0xffe68a, 0xffc43d, (8 - y) / 16)), M.glow);
+    v.add(S.sphere([0, 3, 0], 9), (x, y) => (y > 8 && x < -2 ? 0xfffbe0 : mix(0xffe68a, 0xffc43d, (8 - y) / 16)), M.solid);
     v.add(S.box([-4.5, -10, -4.5], [4.5, -5, 4.5], 1.2), (_x, y) => (y | 0) % 2 ? 0x8b97a4 : 0xc8d2db, M.metal);
     v.add(S.box([-2.5, -12.5, -2.5], [2.5, -10, 2.5], 1), 0x3a3f48, M.metal);
-    bar(v, [-2, 0, 4], [2, 4, 4], 0.7, 0xff9b2e, M.glow);
+    bar(v, [-2, 0, 4], [2, 4, 4], 0.7, 0xff9b2e, M.solid);
     void c;
   },
   brain: (v, c, m) => {
@@ -55,13 +56,13 @@ const SCULPT: Record<GlyphName, Sculpt> = {
   sound: (v, c, m) => {
     v.add(S.box([-11, -4, -3], [-5, 4, 3], 1), tone(c), m);
     for (let y = -9; y <= 9; y++) { const w = 1 + (9 - Math.abs(y)) * 0.0 + (Math.abs(y) < 9 ? 0 : 0); void w; v.add(S.box([-5, Math.max(-9, y), -3], [-5 + (9 - Math.abs(y)) * 0.7 + 1, y + 1, 3], 0.4), tone(c), m); }
-    for (const R of [5, 9]) for (let i = -6; i <= 6; i++) { const a = (i / 6) * 0.9; bar(v, [2 + Math.cos(a) * R, Math.sin(a) * R, 0], [2 + Math.cos(a + 0.15) * R, Math.sin(a + 0.15) * R, 0], 1.2, 0x8cf56b, M.glow); }
+    for (const R of [5, 9]) for (let i = -6; i <= 6; i++) { const a = (i / 6) * 0.9; bar(v, [2 + Math.cos(a) * R, Math.sin(a) * R, 0], [2 + Math.cos(a + 0.15) * R, Math.sin(a + 0.15) * R, 0], 1.2, 0x8cf56b, M.solid); }
   },
   tasks: (v, c, m) => {
     v.add(S.box([-9, -12, -2], [9, 11, 1], 1.5), 0xb8885a, M.solid);
     v.add(S.box([-7.5, -10.5, 0], [7.5, 9.5, 2], 0.5), 0xf4f1e6, M.solid);
     v.add(S.box([-4, 9, -2], [4, 13, 3], 1), 0x9aa6b2, M.metal);
-    for (const y of [5, 0, -5]) { v.add(S.box([-5.5, y - 1, 1.5], [-2.5, y + 2, 3]), c, M.glow); v.add(S.box([-1, y - 0.2, 1.5], [5.5, y + 1.2, 2.6]), 0x6b7680, M.solid); }
+    for (const y of [5, 0, -5]) { v.add(S.box([-5.5, y - 1, 1.5], [-2.5, y + 2, 3]), c, M.solid); v.add(S.box([-1, y - 0.2, 1.5], [5.5, y + 1.2, 2.6]), 0x6b7680, M.solid); }
   },
   bolt: (v, c, m) => {
     const pts: [number, number][] = [[3, 13], [-7, -1], [0, -1], [-4, -13], [8, 3], [1, 3]];
@@ -71,15 +72,15 @@ const SCULPT: Record<GlyphName, Sculpt> = {
         const [xi, yi] = pts[i], [xj, yj] = pts[j];
         if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
       }
-      if (inside) v.add(S.box([x, y, -2.5], [x + 0.6, y + 0.6, 2.5]), mix(c, 0xffffff, (y + 13) / 60), M.glow);
+      if (inside) v.add(S.box([x, y, -2.5], [x + 0.6, y + 0.6, 2.5]), mix(c, 0xffffff, (y + 13) / 60), M.solid);
     }
     void m;
   },
   eye: (v, c, m) => {
-    v.add(S.ellipsoid([0, 0, 0], [12, 7.5, 4]), 0xf8fbff, M.jelly);
-    v.add(S.disc([0, 0, 3.2], [0, 0, 1], 5, 1.2), tone(c), M.jelly);
+    v.add(S.ellipsoid([0, 0, 0], [12, 7.5, 4]), 0xf8fbff, M.solid);
+    v.add(S.disc([0, 0, 3.2], [0, 0, 1], 5, 1.2), tone(c), M.solid);
     v.add(S.disc([0, 0, 4.2], [0, 0, 1], 2.6, 0.8), 0x07090c, M.gloss);
-    v.add(S.sphere([-1.5, 1.6, 5], 0.9), 0xffffff, M.glow);
+    v.add(S.sphere([-1.5, 1.6, 5], 0.9), 0xffffff, M.solid);
     void m;
   },
   star: (v, c, m) => {
@@ -97,12 +98,12 @@ const SCULPT: Record<GlyphName, Sculpt> = {
     v.add(S.box([-8, 3, -1], [8, 8, 1]), 0xf4f1e6, M.solid);
   },
   alien: (v, c, m) => {
-    v.add(S.ellipsoid([0, -1, 0], [11, 10, 8]), tone(c), M.jelly);
+    v.add(S.ellipsoid([0, -1, 0], [11, 10, 8]), tone(c), M.solid);
     for (const sx of [-1, 1]) {
       v.paint(S.ellipsoid([sx * 4.5, -1, 6], [3.2, 5, 4]), 0x07090c, M.gloss);
-      v.paint(S.sphere([sx * 4.5 + 1.2, 1.4, 7.5], 1.2), 0xffffff, M.glow);
-      bar(v, [sx * 4, 8, 0], [sx * 7, 13, 0], 1, tone(c), M.jelly);
-      v.add(S.disc([sx * 7.5, 13.5, 0.5], [0, 0, 1], 2.6, 0.9, 8), sx < 0 ? 0xff7ad9 : 0x3b5bff, M.glow);
+      v.paint(S.sphere([sx * 4.5 + 1.2, 1.4, 7.5], 1.2), 0xffffff, M.solid);
+      bar(v, [sx * 4, 8, 0], [sx * 7, 13, 0], 1, tone(c), M.solid);
+      v.add(S.disc([sx * 7.5, 13.5, 0.5], [0, 0, 1], 2.6, 0.9, 8), sx < 0 ? 0xff7ad9 : 0x3b5bff, M.solid);
     }
     void m;
   },
@@ -114,45 +115,45 @@ const SCULPT: Record<GlyphName, Sculpt> = {
     v.add(S.sphere([-12, -12, 0], 0.9), 0x2b2f36, M.solid);
   },
   dna: (v, c, m) => {
-    v.add(S.capsule([0, -9, 0], [0, 9, 0], 6), (_x, y) => (y > 0 ? mix(c, 0xffffff, 0.2) : shade(c, 0.7)), M.jelly);
+    v.add(S.capsule([0, -9, 0], [0, 9, 0], 6), (_x, y) => (y > 0 ? mix(c, 0xffffff, 0.2) : shade(c, 0.7)), M.solid);
     v.add(S.disc([0, 0, 0], [0, 1, 0], 6.3, 0.7), 0xe8ecf0, M.metal);
-    for (let i = 0; i < 10; i++) { const y = -7 + i * 1.5, a = i * 0.7; bar(v, [Math.cos(a) * 3, y, Math.sin(a) * 3 + 3], [-Math.cos(a) * 3, y, -Math.sin(a) * 3 + 3], 0.5, 0xffffff, M.glow); }
+    for (let i = 0; i < 10; i++) { const y = -7 + i * 1.5, a = i * 0.7; bar(v, [Math.cos(a) * 3, y, Math.sin(a) * 3 + 3], [-Math.cos(a) * 3, y, -Math.sin(a) * 3 + 3], 0.5, 0xffffff, M.solid); }
   },
   chat: (v, c, m) => {
     v.add(S.box([-12, -6, -3], [12, 10, 3], 4), tone(c), m);
     for (let i = 0; i < 6; i++) v.add(S.box([-7 + i * 0.6, -6 - i, -2.5], [-3, -5 - i, 2.5]), tone(c), m);
-    for (const x of [-6, 0, 6]) v.add(S.sphere([x, 2, 3], 1.8), 0xffffff, M.glow);
+    for (const x of [-6, 0, 6]) v.add(S.sphere([x, 2, 3], 1.8), 0xffffff, M.solid);
   },
   sparkle: (v, c, m) => {
     for (const [cx, cy, s] of [[0, 1, 1], [-8, -8, 0.45], [8, 9, 0.4]] as const) {
-      for (let a = 0; a < 4; a++) { const ang = (a / 4) * Math.PI * 2; v.add(S.capsule([cx, cy, 0], [cx + Math.cos(ang) * 12 * s, cy + Math.sin(ang) * 12 * s, 0], 3 * s, 0.4), mix(c, 0xffffff, 0.3), M.glow); }
-      v.add(S.sphere([cx, cy, 0], 3.2 * s), 0xffffff, M.glow);
+      for (let a = 0; a < 4; a++) { const ang = (a / 4) * Math.PI * 2; v.add(S.capsule([cx, cy, 0], [cx + Math.cos(ang) * 12 * s, cy + Math.sin(ang) * 12 * s, 0], 3 * s, 0.4), mix(c, 0xffffff, 0.3), M.solid); }
+      v.add(S.sphere([cx, cy, 0], 3.2 * s), 0xffffff, M.solid);
     }
     void m;
   },
   code: (v, c, m) => {
     bar(v, [-5, 8, 0], [-12, 0, 0], 2.2, tone(c), m); bar(v, [-12, 0, 0], [-5, -8, 0], 2.2, tone(c), m);
     bar(v, [5, 8, 0], [12, 0, 0], 2.2, tone(c), m); bar(v, [12, 0, 0], [5, -8, 0], 2.2, tone(c), m);
-    bar(v, [3, 10, 0], [-3, -10, 0], 1.8, 0x8cf56b, M.glow);
+    bar(v, [3, 10, 0], [-3, -10, 0], 1.8, 0x8cf56b, M.solid);
   },
   terminal: (v, c, m) => {
     v.add(S.box([-13, -6, -4], [13, 12, 3], 2), tone(0x3a4450), M.metal);
     v.add(S.box([-11, -4, 2], [11, 10, 3.5], 0.6), 0x06140c, M.gloss);
-    for (let i = 0; i < 4; i++) v.add(S.box([-9, 7 - i * 3, 3], [-9 + 4 + ((i * 5) % 12), 8 - i * 3, 4]), c, M.glow);
+    for (let i = 0; i < 4; i++) v.add(S.box([-9, 7 - i * 3, 3], [-9 + 4 + ((i * 5) % 12), 8 - i * 3, 4]), c, M.solid);
     v.add(S.box([-3, -10, -2], [3, -6, 1]), 0x2b333c, M.metal); v.add(S.box([-8, -12, -4], [8, -10, 3], 1), 0x3a4450, M.metal);
     void m;
   },
   ufo: (v, c, m) => {
     v.add(S.ellipsoid([0, -1, 0], [14, 3.6, 10]), tone(0xb8c4cf), M.metal);
     v.add(S.ellipsoid([0, 3, 0], [6.5, 6, 5]), mix(c, 0xd8fbff, 0.4), M.glass);
-    v.add(S.ellipsoid([0, 1.5, 0], [3, 3.4, 2.6]), 0x8cf56b, M.jelly);
-    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; v.add(S.sphere([Math.cos(a) * 11, -1.2, Math.sin(a) * 7.5], 1.3), i % 2 ? 0xffe14d : c, M.glow); }
+    v.add(S.ellipsoid([0, 1.5, 0], [3, 3.4, 2.6]), 0x8cf56b, M.solid);
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; v.add(S.sphere([Math.cos(a) * 11, -1.2, Math.sin(a) * 7.5], 1.3), i % 2 ? 0xffe14d : c, M.solid); }
     void m;
   },
   shop: (v, c, m) => {
     v.add(S.box([-10, -13, -5], [10, 13, 4], 1.5), tone(c), m);
     v.add(S.box([-8, -4, 3], [5, 11, 4.5], 0.5), 0x0a1a12, M.gloss);
-    for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) v.add(S.sphere([-5.5 + k * 4.3, 8 - r * 4.6, 4.5], 1.4), [0xff7ad9, 0x8cf56b, 0x52f2ff][(r + k) % 3], M.glow);
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) v.add(S.sphere([-5.5 + k * 4.3, 8 - r * 4.6, 4.5], 1.4), [0xff7ad9, 0x8cf56b, 0x52f2ff][(r + k) % 3], M.solid);
     v.add(S.box([6, 2, 3], [9, 10, 4.6], 0.4), 0x2b333c, M.metal);
     v.add(S.box([-8, -11, 3], [8, -7, 4.6], 0.5), 0x050806, M.gloss);
   },
@@ -160,15 +161,15 @@ const SCULPT: Record<GlyphName, Sculpt> = {
     for (let y = -11; y <= 12; y += 0.5) { const w = (12 - y) * 0.6; v.add(S.box([-w, y, -3], [w, y + 0.6, 3], 0.2), tone(c), m); }
     v.add(S.box([-1.4, -3, 2.5], [1.4, 6, 4]), 0x14100a, M.gloss); v.add(S.sphere([0, -7, 3.2], 1.6), 0x14100a, M.gloss);
   },
-  pin: (v, c, m) => { v.add(S.sphere([0, 5, 0], 6.5), tone(c), M.jelly); v.add(S.sphere([-2, 7.5, 4.5], 1.5), 0xffffff, M.glow); bar(v, [0, -1, 0], [0, -13, 0], 1, 0xc8d2db, M.metal); void m; },
+  pin: (v, c, m) => { v.add(S.sphere([0, 5, 0], 6.5), tone(c), M.solid); v.add(S.sphere([-2, 7.5, 4.5], 1.5), 0xffffff, M.solid); bar(v, [0, -1, 0], [0, -13, 0], 1, 0xc8d2db, M.metal); void m; },
   arcade: (v, c, m) => {
     v.add(S.box([-9, -14, -6], [9, 14, 5], 1.2), tone(c), m);
     v.add(S.box([-7, 0, 3.5], [7, 10, 5.5], 0.5), 0x101632, M.gloss);
-    for (let i = 0; i < 3; i++) v.add(S.box([-5 + i * 3.6, 3 + (i % 2) * 2, 5], [-3 + i * 3.6, 5 + (i % 2) * 2, 6]), [0x8cf56b, 0xff7ad9, 0xffe14d][i], M.glow);
+    for (let i = 0; i < 3; i++) v.add(S.box([-5 + i * 3.6, 3 + (i % 2) * 2, 5], [-3 + i * 3.6, 5 + (i % 2) * 2, 6]), [0x8cf56b, 0xff7ad9, 0xffe14d][i], M.solid);
     v.add(S.box([-9, -4, -3], [9, -1, 7], 0.6), shade(c, 0.7), m);
-    v.add(S.capsule([-3, -1, 5], [-3, 3, 5], 0.7), 0x2b2f36, M.metal); v.add(S.sphere([-3, 3.5, 5], 1.6), 0xff4f6a, M.jelly);
-    for (const x of [2, 5]) v.add(S.sphere([x, -1, 5.5], 1.2), 0x52f2ff, M.glow);
-    v.add(S.box([-8, 11, 3], [8, 13.5, 5.5], 0.4), 0xffe14d, M.glow);
+    v.add(S.capsule([-3, -1, 5], [-3, 3, 5], 0.7), 0x2b2f36, M.metal); v.add(S.sphere([-3, 3.5, 5], 1.6), 0xff4f6a, M.solid);
+    for (const x of [2, 5]) v.add(S.sphere([x, -1, 5.5], 1.2), 0x52f2ff, M.solid);
+    v.add(S.box([-8, 11, 3], [8, 13.5, 5.5], 0.4), 0xffe14d, M.solid);
   },
   stop: (v, c, m) => {
     for (let a = 0; a < 8; a++) void a;
@@ -179,7 +180,7 @@ const SCULPT: Record<GlyphName, Sculpt> = {
     v.add(S.box([-13, -9, -3], [13, 10, 2], 1.5), tone(0x3a4450), M.metal);
     v.add(S.box([-11, -7, 1.5], [11, 6, 3], 0.4), 0x0a1a12, M.gloss);
     v.add(S.box([1, -9, 2], [15, 2, 6], 1), tone(c), m);
-    v.add(S.box([2.5, -7.5, 5.5], [13.5, 0.5, 6.6]), mix(c, 0xffffff, 0.4), M.glow);
+    v.add(S.box([2.5, -7.5, 5.5], [13.5, 0.5, 6.6]), mix(c, 0xffffff, 0.4), M.solid);
   },
   trash: (v, c, m) => {
     v.add(S.cone(0, 0, -13, 7, 7.5, 9), (x, y, z) => (Math.abs(((x + z) * 1.1) % 4) < 1 ? shade(c, 0.75) : tone(c)(x, y)), m);
@@ -190,20 +191,20 @@ const SCULPT: Record<GlyphName, Sculpt> = {
   file: (v, c, m) => {
     v.add(S.box([-9, -12, -1.5], [9, 12, 1.5], 0.5), 0xf6f3ea, M.solid);
     v.carve(S.box([4, 7, -3], [12, 14, 3]));
-    for (let y = 4; y > -10; y -= 3) v.add(S.box([-6, y, 1], [y > 0 ? 2 : 6, y + 1, 2.2]), c, M.glow);
+    for (let y = 4; y > -10; y -= 3) v.add(S.box([-6, y, 1], [y > 0 ? 2 : 6, y + 1, 2.2]), c, M.solid);
     void m;
   },
   wardrobe: (v, c, m) => {
     v.add(S.cyl(0, 0, 6.5, -1, 11), tone(c), m);
     v.add(S.disc([0, -1, 0], [0, 1, 0], 11, 1.4), tone(c), m);
-    v.add(S.cyl(0, 0, 6.7, 0.5, 3), 0xff4fa8, M.glow);
-    v.add(S.sphere([-3, 8, 5], 1.2), 0xffffff, M.glow);
+    v.add(S.cyl(0, 0, 6.7, 0.5, 3), 0xff4fa8, M.solid);
+    v.add(S.sphere([-3, 8, 5], 1.2), 0xffffff, M.solid);
   },
   send: (v, c, m) => {
     v.add(S.capsule([-5, -5, 0], [5, 5, 0], 4.2, 3), (x, y) => (x + y > 6 ? 0xff4f6a : tone(0xe8ecf0)(x, y)), M.metal);
     v.add(S.sphere([1.5, 1.5, 3.4], 1.8), 0x52f2ff, M.glass);
     bar(v, [-6, -1, 0], [-11, -1, 0], 1.6, tone(c), m); bar(v, [-1, -6, 0], [-1, -11, 0], 1.6, tone(c), m);
-    v.add(S.capsule([-7, -7, 0], [-12, -12, 0], 2.6, 0.6), 0xffa21a, M.glow);
+    v.add(S.capsule([-7, -7, 0], [-12, -12, 0], 2.6, 0.6), 0xffa21a, M.solid);
   },
   trophy: (v, c, m) => {
     v.add(S.cone(0, 0, -2, 11, 3, 9), tone(c), m);
@@ -211,22 +212,22 @@ const SCULPT: Record<GlyphName, Sculpt> = {
     ring(v, [-9, 6, 0], 3.4, 1.2, tone(c), m); ring(v, [9, 6, 0], 3.4, 1.2, tone(c), m);
     v.add(S.cyl(0, 0, 1.6, -8, -2), tone(c), m);
     v.add(S.box([-6, -13, -4], [6, -8, 4], 1), 0x5a3a20, M.solid);
-    v.add(S.sphere([-3, 8, 5], 1.2), 0xffffff, M.glow);
+    v.add(S.sphere([-3, 8, 5], 1.2), 0xffffff, M.solid);
   },
   fuel: (v, c, m) => {
     v.add(S.box([-8, -12, -5], [8, 10, 5], 2.4), tone(0xc8d2db), M.metal);
-    v.add(S.box([-6.5, -10.5, 4], [6.5, 4 - 0, 5.6], 0.5), c, M.glow);
+    v.add(S.box([-6.5, -10.5, 4], [6.5, 4 - 0, 5.6], 0.5), c, M.solid);
     v.add(S.box([-6.5, 4, 4], [6.5, 8.5, 5.4], 0.5), 0x0b1310, M.gloss);
     v.add(S.capsule([3, 10, 0], [6, 14, 0], 1.6), 0x6b7680, M.metal);
-    for (let i = 0; i < 4; i++) v.add(S.sphere([-3 + (i % 2) * 5, -8 + i * 3, 5.6], 0.9), 0xffffff, M.glow);
+    for (let i = 0; i < 4; i++) v.add(S.sphere([-3 + (i % 2) * 5, -8 + i * 3, 5.6], 0.9), 0xffffff, M.solid);
     void m;
   },
   slot: (v, c, m) => {
     v.add(S.box([-11, -13, -5], [9, 12, 5], 2), tone(c), m);
     v.add(S.box([-9, -3, 3.5], [7, 6, 5.5], 0.6), 0xfbfff3, M.solid);
-    for (let i = 0; i < 3; i++) v.add(S.box([-7.5 + i * 5, -1.5, 5], [-4.5 + i * 5, 4.5, 6]), 0xff3a5a, M.glow);
-    v.add(S.capsule([11, -4, 0], [11, 9, 0], 1), 0xc8d2db, M.metal); v.add(S.sphere([11, 10, 0], 2.4), 0xff3a5a, M.jelly);
-    v.add(S.box([-9, 8, 3.5], [7, 11, 5.5], 0.4), 0xffe14d, M.glow);
+    for (let i = 0; i < 3; i++) v.add(S.box([-7.5 + i * 5, -1.5, 5], [-4.5 + i * 5, 4.5, 6]), 0xff3a5a, M.solid);
+    v.add(S.capsule([11, -4, 0], [11, 9, 0], 1), 0xc8d2db, M.metal); v.add(S.sphere([11, 10, 0], 2.4), 0xff3a5a, M.solid);
+    v.add(S.box([-9, 8, 3.5], [7, 11, 5.5], 0.4), 0xffe14d, M.solid);
   },
   sword: (v, c, m) => {
     v.add(S.box([-1.6, -3, -1], [1.6, 13, 1], 0.4), (_x, y) => mix(0xc8d2db, 0xffffff, (y + 3) / 20), M.metal);
@@ -251,9 +252,9 @@ const SCULPT: Record<GlyphName, Sculpt> = {
   heart: (v, c, m) => {
     for (let y = -12; y <= 11; y += 0.5) for (let x = -13; x <= 13; x += 0.5) {
       const X = x / 11, Y = y / 11 + 0.25, a = X * X + Y * Y - 1;
-      if (a * a * a - X * X * Y * Y * Y <= 0) v.add(S.box([x, y, -3.5], [x + 0.6, y + 0.6, 3.5], 0.3), tone(c), M.jelly);
+      if (a * a * a - X * X * Y * Y * Y <= 0) v.add(S.box([x, y, -3.5], [x + 0.6, y + 0.6, 3.5], 0.3), tone(c), M.solid);
     }
-    v.add(S.sphere([-5, 4, 3.5], 1.6), 0xffffff, M.glow);
+    v.add(S.sphere([-5, 4, 3.5], 1.6), 0xffffff, M.solid);
     void m;
   },
   check: (v, c, m) => { bar(v, [-10, 0, 0], [-3, -8, 0], 3, tone(c), m); bar(v, [-3, -8, 0], [11, 9, 0], 3, tone(c), m); },
@@ -275,11 +276,11 @@ export function buildGlyph(name: GlyphName, color: number, opts: { gold?: boolea
     const v = g();
     const base = opts.gold ? 0xffc53d : color;
     const sculpt = SCULPT[name] ?? SCULPT.star;
-    sculpt(v, base, opts.gold ? M.metal : M.jelly, () => {});
+    sculpt(v, base, opts.gold ? M.metal : M.solid, () => {});
     if (opts.gold) {
       // polished gold: everything metal-gold except glow bits, plus glints
-      v.recolor((x, y, zz, c, m) => (m === M.glow ? undefined : [mix(0xb8860b, 0xfff0a0, (y + 14) / 30 + (hash3(x | 0, y | 0, zz | 0) - 0.5) * 0.08), M.metal]));
-      v.recolor((x, y, zz, _c, m) => (m === M.metal && hash3(x * 3 | 0, y * 3 | 0, zz * 3 | 0, 9) > 0.992 ? [0xffffff, M.glow] : undefined));
+      v.recolor((x, y, zz, c, m) => (m === M.solid ? undefined : [mix(0xb8860b, 0xfff0a0, (y + 14) / 30 + (hash3(x | 0, y | 0, zz | 0) - 0.5) * 0.08), M.metal]));
+      v.recolor((x, y, zz, _c, m) => (m === M.metal && hash3(x * 3 | 0, y * 3 | 0, zz * 3 | 0, 9) > 0.992 ? [0xffffff, M.solid] : undefined));
     }
     if (opts.dim) v.recolor((x, y) => [mix(0x1b2420, 0x2c3a33, (y + 14) / 28 + (x < 0 ? 0.05 : 0)), M.solid]);
     const ink = opts.dim ? 0x070b09 : opts.gold ? 0x3a2606 : shade(mix(color, 0x0a1a12, 0.5), 0.35);

@@ -185,6 +185,10 @@ export function smoothUnion(a: Shape, b: Shape, k: number): Shape {
 export class VoxGrid {
   readonly col: Uint32Array;
   readonly mat: Uint8Array;
+  /** Per-voxel surface texture id (0 = plain colour). See src/vox/tex.ts. */
+  readonly tx: Uint8Array;
+  /** Texture id stamped by subsequent add / set / paint calls (see tex()). */
+  curTex = 0;
   /** Voxel coordinate of array index 0 (so models can be centred on 0). */
   readonly o: V3;
   /**
@@ -196,9 +200,13 @@ export class VoxGrid {
   constructor(readonly w: number, readonly h: number, readonly d: number, origin: V3 = [0, 0, 0], res = 1) {
     this.col = new Uint32Array(w * h * d);
     this.mat = new Uint8Array(w * h * d);
+    this.tx = new Uint8Array(w * h * d);
     this.o = origin;
     this.res = res;
   }
+
+  /** Select the surface texture for following brush calls (0 = none). Chainable. */
+  tex(id: number) { this.curTex = id; return this; }
 
   /** Grid that spans [min, max) in MODEL units at `res` voxels per unit. */
   static span(min: V3, max: V3, res = 1) {
@@ -210,7 +218,7 @@ export class VoxGrid {
   /** An empty grid with the same extent / resolution. */
   blank() { return new VoxGrid(this.w, this.h, this.d, [...this.o] as V3, this.res); }
   /** A full copy. */
-  copy() { const g = this.blank(); g.col.set(this.col); g.mat.set(this.mat); return g; }
+  copy() { const g = this.blank(); g.col.set(this.col); g.mat.set(this.mat); g.tx.set(this.tx); return g; }
   /** model-unit centre of voxel index coordinate */
   mc(v: number) { return (v + 0.5) / this.res; }
 
@@ -223,8 +231,9 @@ export class VoxGrid {
   color(x: number, y: number, z: number) { const i = this.idx(x, y, z); return i < 0 ? 0 : this.col[i]; }
   set(x: number, y: number, z: number, c: number, m: Mat = M.solid) {
     const i = this.idx(x, y, z); if (i < 0) return this;
-    this.col[i] = c; this.mat[i] = m; return this;
+    this.col[i] = c; this.mat[i] = m; this.tx[i] = this.curTex; return this;
   }
+  texAt(x: number, y: number, z: number) { const i = this.idx(x, y, z); return i < 0 ? 0 : this.tx[i]; }
   del(x: number, y: number, z: number) { const i = this.idx(x, y, z); if (i >= 0) this.mat[i] = 0; return this; }
 
   /** Apply a shape. Voxel centres (x+.5…) inside the field are affected. */
@@ -243,7 +252,7 @@ export class VoxGrid {
       if (mode === 'paint' && !this.mat[i]) continue;
       if (mode === 'under' && this.mat[i]) continue;
       this.col[i] = fn ? fn(mx, my, mz) : (col as number);
-      if (mode !== 'paint') this.mat[i] = m; else if (m) this.mat[i] = m;
+      if (mode !== 'paint') { this.mat[i] = m; this.tx[i] = this.curTex; } else { if (m) this.mat[i] = m; if (this.curTex) this.tx[i] = this.curTex; }
     }
     return this;
   }
@@ -278,7 +287,7 @@ export class VoxGrid {
       const mx = -x - 1;
       const src = i + this.w * (j + this.h * k);
       const dst = this.idx(mx, j + this.o[1], k + this.o[2]);
-      if (dst >= 0) { this.mat[dst] = this.mat[src]; this.col[dst] = this.col[src]; }
+      if (dst >= 0) { this.mat[dst] = this.mat[src]; this.col[dst] = this.col[src]; this.tx[dst] = this.tx[src]; }
     }
     return this;
   }

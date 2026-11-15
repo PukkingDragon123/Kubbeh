@@ -2,7 +2,8 @@
 // photographed once by the studio at the device's pixel ratio and cached as an image.
 // API unchanged from v1 so every caller keeps working: <Icon name size class title />.
 import { buildIcon, poseOf } from '../../vox/ui/icons';
-import { photoURL, studioRenderer } from '../../vox/studio';
+import { studioRenderer } from '../../vox/studio';
+import { pixelURL } from '../../vox/ui/pixel';
 
 export type IconName =
   | 'terminal' | 'idea' | 'shop' | 'wardrobe' | 'slot' | 'fuel' | 'wrench' | 'gear' | 'sound' | 'mute'
@@ -25,19 +26,24 @@ const PX: Record<string, number> = { sm: 18, md: 22, lg: 32, xl: 46 };
 const urls = new Map<string, string>();
 let gl: boolean | null = null;
 
-/** Data URL of an icon rendered for `cssPx` at the current device pixel ratio. */
+/** Art-pixel scale for a CSS size: small icons draw 1 art px per CSS px, big ones are chunkier. */
+export const artScale = (cssPx: number) => (cssPx >= 40 ? 2 : 1);
+
+/**
+ * Data URL of an icon as pixel art: the voxel model is photographed 4× larger, box-downsampled
+ * to exactly cssPx / artScale pixels, posterised, rim-lit and inked (src/vox/ui/pixel.ts).
+ * Shown with image-rendering: pixelated at an integer upscale.
+ */
 export function iconURL(name: string, cssPx: number): string {
-  const dpr = Math.min(3, Math.max(1, Math.round((globalThis.devicePixelRatio || 1) * 2) / 2));
-  // render at a few fixed buckets so icons of similar size share one image
-  const bucket = cssPx <= 18 ? 18 : cssPx <= 24 ? 24 : cssPx <= 34 ? 34 : cssPx <= 48 ? 48 : cssPx <= 72 ? 72 : 128;
-  const w = Math.round(bucket * dpr);
+  if (gl === null) gl = !!studioRenderer();
+  if (!gl) return '';
+  const k = artScale(cssPx);
+  const w = Math.round(cssPx / k);
   const key = `${name}|${w}`;
   const hit = urls.get(key);
   if (hit) return hit;
-  if (gl === null) gl = !!studioRenderer();
-  if (!gl) return '';
   const pose = poseOf(name);
-  const url = photoURL(buildIcon(name), w, w, { key: 'icon:' + name, yaw: pose.yaw, pitch: pose.pitch, fill: 0.94, ss: 2 });
+  const url = pixelURL(() => buildIcon(name), w, w, { key: 'icon:' + name, yaw: pose.yaw, pitch: pose.pitch, fill: 1.08 });
   urls.set(key, url);
   return url;
 }

@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import type { PanelId } from '../core/types';
 import { M, S, hash3, mix, shade } from '../vox/core';
-import { PAL, U, grid, mesh, plate, hazard, stampText, textWidth, glowMat, vgrad } from '../vox/props/kit';
+import { PAL, U, grid, mesh, plate, hazard, stampText, textWidth, glowMat, vgrad, GLOW_LAMP } from '../vox/props/kit';
+import { T } from '../vox/tex';
 import { crew, economy, fuel, activeProjectId, projects } from '../core/state';
 import type { Particles } from './particles';
 
@@ -63,6 +64,7 @@ function computer(): Station {
   g.position.set(1.2, 0, -7.0);
   // desk: curved console 5 wide, 1.6 deep (model units ×16)
   const d = grid([-42, 0, -14], [42, 66, 14], 1.5);
+  d.tex(T.console);
   const deskTop = (x: number) => 15 + Math.cos((x / 40) * Math.PI * 0.5) * 0.5;
   d.add(S.box([-40, 0, -12], [40, 14, 10], 1.2), (x, y, z) => {
     if (y < 1.5) return PAL.hullDeep;
@@ -77,6 +79,7 @@ function computer(): Station {
   }
   // big monitors on articulated arms: frames only, holo content is live voxels
   const monitor = (cx: number, w: number, h: number, y0: number, tilt: number) => {
+    d.tex(T.paint);
     d.add(S.box([cx - 1.4, 16, -10], [cx + 1.4, y0, -8]), PAL.steelDark, M.metal);
     d.add(S.box([cx - w / 2 - 1.6, y0, -11 + tilt], [cx + w / 2 + 1.6, y0 + h + 3, -7.6 + tilt], 0.8), (x, y) => (y > y0 + h + 1.8 ? PAL.hullHi : PAL.hullDeep), M.metal);
     d.carve(S.box([cx - w / 2, y0 + 1.5, -8.4 + tilt], [cx + w / 2, y0 + h + 1.5, -7 + tilt]));
@@ -90,11 +93,11 @@ function computer(): Station {
   // hologram emitter puck
   d.add(S.cyl(0, 6, 4, 16, 18), PAL.steel, M.metal);
   d.add(S.cyl(0, 6, 2.6, 18, 18.6), 0xffffff, M.glow);
-  const body = setGlow(mesh(d), glowMat(0xc8ffe8, 1.6));
+  const body = setGlow(mesh(d), glowMat(0xc8ffe8, 1.0));
   g.add(body);
 
   // live holo content on the 3 screens (instanced voxel bars & waves)
-  const L = new VoxBars(10, 7, 1.6 * U, PAL.glob), C = new VoxBars(14, 9, 1.6 * U, PAL.cyan), R = new VoxBars(10, 7, 1.6 * U, PAL.pink);
+  const L = new VoxBars(10, 7, 1.6 * U, 0x8ad8a0, 0.95), C = new VoxBars(14, 9, 1.6 * U, 0x8ad0e0, 0.95), R = new VoxBars(10, 7, 1.6 * U, 0xe0a080, 0.95);
   L.mesh.position.set(-25 * U, 24 * U, (-7.6 + 1.5) * U);
   C.mesh.position.set(0, 26.2 * U, -7.6 * U);
   R.mesh.position.set(25 * U, 24 * U, (-7.6 + 1.5) * U);
@@ -106,7 +109,7 @@ function computer(): Station {
   hg.add(S.sphere([0, 0, 0], 6), (x, y, z) => ((Math.floor(x * 0.6) + Math.floor(y * 0.6) + Math.floor(z * 0.6)) % 2 ? 0xffffff : 0x8ad8ff), M.glow);
   hg.carve(S.sphere([0, 0, 0], 5));
   hg.add(S.torus([0, 0, 0], [0.3, 1, 0], 7.4, 0.5), 0xffffff, M.glow);
-  const holoMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(0.2, 0.8, 0.75), transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const holoMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(0.18, 0.6, 0.6), transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
   const hm = mesh(hg, { castShadow: false }); hm.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = holoMat; });
   holo.add(hm);
   g.add(holo);
@@ -146,6 +149,7 @@ function ideaDesk(): Station {
   const g = new THREE.Group();
   g.position.set(-6.2, 0, 1.5);
   const d = grid([-24, 0, -12], [24, 60, 10], 1.5);
+  d.tex(T.wood);
   // curved wooden-and-brass desk facing the room
   d.add(S.box([-20, 0, -6], [20, 13, 6], 1.2), (x, y, z) => {
     if (y > 11.6) return PAL.woodDark;
@@ -158,10 +162,12 @@ function ideaDesk(): Station {
   d.add(S.cyl(14, -2, 2.2, 15, 21), PAL.pink, M.metal); d.add(S.capsule([16.2, 19, -2], [17.6, 17, -2], 0.6), PAL.pink, M.metal); // mug
   d.add(S.cyl(14, -2, 1.7, 20, 20.6), 0x5a3a1a, M.solid);
   // brass hologram projector + idea bulb machine
+  d.tex(T.pipe);
   d.add(S.cyl(0, -1, 5, 15, 18), 0xb8862a, M.metal);
   d.add(S.cyl(0, -1, 3.4, 18, 19), 0xffffff, M.glow);
   for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; d.add(S.sphere([Math.cos(a) * 4.4, 17, -1 + Math.sin(a) * 4.4], 0.6), PAL.chrome, M.metal); }
-  // chalk-holo board behind
+  // chalk board behind
+  d.tex(0);
   d.add(S.box([-23, 20, -11], [23, 58, -9], 1), (x, y) => (Math.min(x + 23, 23 - x, y - 20, 58 - y) < 2 ? PAL.woodDark : 0x1e3a2a), M.solid);
   // chalk doodles in voxels: a jelly alien, an arrow, "IDEA!", a jump arc
   const chalk = 0xe8f4e0;
@@ -172,7 +178,7 @@ function ideaDesk(): Station {
   for (let i = 0; i <= 30; i++) { const x = -20 + i * 0.75, y = 27 + Math.sin((i / 30) * Math.PI) * 10; d.add(S.sphere([x, y, -8.8], 0.45), chalk, M.solid); }
   d.add(S.box([-21, 25, -9], [-18, 28, -8.4]), PAL.pink, M.solid);
   d.add(S.box([-1, 25, -9], [2, 28, -8.4]), PAL.cyan, M.solid);
-  const body = setGlow(mesh(d), glowMat(0xff9ae2, 1.6));
+  const body = setGlow(mesh(d), glowMat(0xffd8f0, 1.0));
   g.add(body);
   // floating hologram brain (voxel, additive)
   const brain = new THREE.Group(); brain.position.set(0, 27 * U, -1 * U);
@@ -180,7 +186,7 @@ function ideaDesk(): Station {
   bg.add(S.ellipsoid([-2.4, 0, 0], [4, 4.4, 5.2]), (x, y, z) => (Math.sin(x * 2 + Math.sin(z * 1.7) * 2) > 0.5 ? 0xffffff : 0xff9ae2), M.glow);
   bg.add(S.ellipsoid([2.4, 0, 0], [4, 4.4, 5.2]), (x, y, z) => (Math.sin(z * 2.2 + y * 1.6) > 0.5 ? 0xffffff : 0xff9ae2), M.glow);
   bg.carve(S.box([-0.25, -6, -6], [0.25, 6, 6]));
-  const brainMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.3, 0.9, 1.4), transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const brainMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(0.85, 0.6, 0.9), transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
   const bm = mesh(bg, { castShadow: false }); bm.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = brainMat; });
   brain.add(bm);
   g.add(brain);
@@ -194,7 +200,7 @@ function ideaDesk(): Station {
       brain.rotation.y += dt * (active ? 1.8 : 0.5);
       brain.position.y = 27 * U + Math.sin(t * 1.6) * 0.04;
       const k = active ? 1 + Math.sin(t * 8) * 0.25 : 0.75 + Math.sin(t * 1.5) * 0.1;
-      brainMat.opacity = 0.55 * k + 0.2;
+      brainMat.opacity = 0.3 * k + 0.12;
     },
   };
 }
@@ -206,6 +212,7 @@ function fuelTank(fx: Particles): Station & { lamps: THREE.MeshBasicMaterial[] }
   const H = 84; // model units of tank interior (5.25 world)
   const R = 19;
   const t = grid([-26, 0, -26], [26, 104, 26], 1);
+  t.tex(T.hull);
   // base plinth with hazard ring
   t.add(S.cyl(0, 0, 23, 0, 8), (x, y, z) => { const r = Math.hypot(x, z); if (y > 6.6) return PAL.hullHi; if (r > 21.6) return hazard(Math.atan2(z, x) * 10, y, 2); return plate(PAL.hullDark, Math.atan2(z, x) * 12, y, { pw: 8, ph: 8 }); }, M.metal);
   // top cap
@@ -221,28 +228,30 @@ function fuelTank(fx: Particles): Station & { lamps: THREE.MeshBasicMaterial[] }
   const markers = [0.5, 0.25, 0.1];
   for (const mk of markers) t.add(S.torus([0, 8 + H * mk, 0], [0, 1, 0], R + 1, 0.8), PAL.hazardY, M.metal);
   // glass
-  t.add(S.cyl(0, 0, R, 8, 8 + H), PAL.glass, M.glass);
+  t.tex(T.glass).add(S.cyl(0, 0, R, 8, 8 + H), PAL.glass, M.glass);
+  t.tex(T.pipe);
   t.carve(S.cyl(0, 0, R - 1, 8, 8 + H));
   // pipes into the wall + valve
   t.add(S.capsule([0, 100, -4], [0, 104, -26], 3), PAL.paintTeal, M.metal);
   t.add(S.capsule([-16, 4, -10], [-16, 4, -26], 2.4), PAL.paintTeal, M.metal);
   t.add(S.disc([-16, 4, -18], [0, 0, 1], 4, 0.8, 8), PAL.paintRed, M.metal);
   // FUEL sign plate on the cap
-  t.add(S.box([-10, 8 + H + 1, R + 1.6], [10, 8 + H + 7, R + 2.4]), PAL.hullDeep, M.metal);
-  stampText(t, 'FUEL', -textWidth('FUEL', 1) / 2, 8 + H + 6, R + 2.4, 1, 0xffffff, M.glow, 0.8);
-  const shell = setGlow(mesh(t), glowMat(PAL.glob, 2));
+  t.tex(T.paint).add(S.box([-10, 8 + H + 1, R + 1.6], [10, 8 + H + 7, R + 2.4]), PAL.hazardY, M.metal);
+  t.tex(0);
+  stampText(t, 'FUEL', -textWidth('FUEL', 1) / 2, 8 + H + 6, R + 2.4, 1, PAL.hazardK, M.solid, 0.6);
+  const shell = mesh(t);
   g.add(shell);
 
   // liquid: unit-height voxel column scaled by fuel level, plus a wavy surface disc
   const lg = grid([-18, 0, -18], [18, 16, 18], 1);
   lg.add(S.cyl(0, 0, R - 1.2, 0, 16), (x, y, z) => (Math.sin(y * 0.8 + Math.atan2(z, x) * 3) > 0.7 ? 0xc8ffb0 : 0x5fe060), M.glow);
-  const liquidMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1, 1.3, 1), transparent: true, opacity: 0.72, toneMapped: false, depthWrite: false });
+  const liquidMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(0.8, 1.0, 0.8), transparent: true, opacity: 0.8, toneMapped: false, depthWrite: false });
   const liquid = mesh(lg, { castShadow: false }); liquid.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) { m.material = liquidMat; m.renderOrder = 1; } });
   liquid.position.y = 8 * U;
   g.add(liquid);
   const sg = grid([-18, -1, -18], [18, 1, 18], 1);
   sg.add(S.cyl(0, 0, R - 1.2, -0.5, 0.5), (x, _y, z) => ((Math.floor(x / 3) + Math.floor(z / 3)) % 2 ? 0xe8ffd8 : 0x9dff8a), M.glow);
-  const surfMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.6, 1.8, 1.6), toneMapped: false, transparent: true, opacity: 0.9 });
+  const surfMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.0, 1.1, 1.0), toneMapped: false, transparent: true, opacity: 0.9 });
   const surface = mesh(sg, { castShadow: false }); surface.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = surfMat; });
   g.add(surface);
 
@@ -284,7 +293,7 @@ function fuelTank(fx: Particles): Station & { lamps: THREE.MeshBasicMaterial[] }
       surface.position.y = (8 + hgt) * U + Math.sin(tt * 2) * 0.008;
       surface.rotation.y += dt * 0.2;
       const crit = f.tier === 'critical' || f.tier === 'empty';
-      liquidMat.color.setRGB(crit ? 1.5 : f.tier === 'quarter' ? 1.5 : 1, crit ? 0.55 : f.tier === 'quarter' ? 1.1 : 1.3, crit ? 0.5 : 0.8);
+      liquidMat.color.setRGB(crit ? 1.2 : f.tier === 'quarter' ? 1.15 : 0.8, crit ? 0.45 : f.tier === 'quarter' ? 0.85 : 1.0, crit ? 0.4 : 0.65);
       markers.forEach((mk, i) => {
         const below = f.level < mk;
         const k = below ? (Math.sin(tt * (crit ? 12 : 7)) > 0 ? 2.6 : 0.25) : 1.4;
@@ -310,6 +319,7 @@ function vending(): Station {
   const g = new THREE.Group();
   g.position.set(11.15, 0, -1.4); g.rotation.y = -Math.PI / 2;
   const v = grid([-15, 0, -10], [15, 56, 12], 1.5);
+  v.tex(T.paint);
   v.add(S.box([-14, 0, -9], [14, 52, 9], 1.6), (x, y) => (y < 2 ? PAL.hullDeep : Math.abs(x) > 12.4 ? PAL.pink : 0xd84aaf), M.solid);
   v.carve(S.box([-12, 18, 6], [5, 46, 10]));
   v.add(S.box([-12, 18, 6], [5, 46, 6.8]), 0x1a0f22, M.solid);
@@ -317,11 +327,13 @@ function vending(): Station {
   const caps = [PAL.glob, PAL.cyan, PAL.amber, PAL.violet, PAL.pink];
   for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
     const x = -9.6 + c * 4.1, y = 21.5 + r * 6.4;
-    v.add(S.box([x - 1.8, y - 2.4, 6.8], [x + 1.8, y - 2, 9]), PAL.chrome, M.metal);
+    v.tex(T.plateBig).add(S.box([x - 1.8, y - 2.4, 6.8], [x + 1.8, y - 2, 9]), PAL.chrome, M.metal);
+    v.tex(0);
     v.add(S.capsule([x, y - 0.6, 7.8], [x, y + 1.8, 7.8], 1.2), (px, py) => (py > y + 0.6 ? 0xf6f6f6 : caps[(r + c) % 5]), M.jelly);
     v.add(S.box([x - 0.25, y - 0.4, 8.8], [x + 0.25, y + 1.6, 9.1]), 0xffffff, M.glow);
   }
-  v.add(S.box([-12.4, 17.6, 9], [5.4, 46.4, 9.6]), PAL.glass, M.glass);
+  v.tex(T.glass).add(S.box([-12.4, 17.6, 9], [5.4, 46.4, 9.6]), PAL.glass, M.glass);
+  v.tex(T.console);
   // keypad & coin slot panel
   v.add(S.box([6.5, 20, 6], [12.5, 44, 9.4], 0.4), PAL.hullDark, M.metal);
   for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) v.add(S.box([7.4 + c * 1.8, 30 + r * 2.2, 9.4], [8.6 + c * 1.8, 31.4 + r * 2.2, 10]), (r + c) % 4 === 0 ? 0xffffff : 0x8a9aa4, (r + c) % 4 === 0 ? M.glow : M.metal);
@@ -329,9 +341,11 @@ function vending(): Station {
   v.add(S.box([7, 40, 9.4], [12, 43, 9.8]), 0x2fd8ff, M.glow);
   v.add(S.box([-10, 5, 8], [8, 12, 9.6], 0.6), PAL.hullDeep, M.metal);                       // dispense tray
   // sign
-  v.add(S.box([-14, 46.5, 7], [14, 55, 10], 1), 0x2a0f2a, M.solid);
-  stampText(v, 'GENE-O-MAT', -textWidth('GENE-O-MAT', 0.95) / 2, 53.2, 10, 0.95, 0xffffff, M.glow, 0.6);
-  const body = setGlow(mesh(v), glowMat(0xffc8f0, 1.8));
+  // lightbox sign: a lit translucent panel with dark stencil letters (crisp, not neon)
+  v.tex(T.paint).add(S.box([-14, 46.5, 7], [14, 55, 10], 1), 0x3a1a3a, M.metal);
+  v.tex(0).add(S.box([-13, 47.4, 9.6], [13, 54.2, 10.2]), 0xfff2fa, M.glow);
+  stampText(v, 'GENE-O-MAT', -textWidth('GENE-O-MAT', 0.95) / 2, 53.2, 10.2, 0.95, 0x5a1a4a, M.solid, 0.5);
+  const body = setGlow(mesh(v), glowMat(0xffe0f0, 1.0));
   g.add(body);
   const hit = hitBox(1.9, 3.5, 1.4); g.add(hit);
   return { id: 'vending', label: 'GENE-O-MAT', panel: 'shop', group: g, pick: [hit, body], rect: [10.3, -2.3, 11.8, -0.5], anchor: new THREE.Vector3(10.6, 1.7, -1.4), spots: [] };
@@ -342,18 +356,19 @@ function wardrobe(): Station {
   const g = new THREE.Group();
   g.position.set(11.15, 0, 2.6); g.rotation.y = -Math.PI / 2;
   const w = grid([-16, 0, -10], [16, 60, 12], 1.5);
+  w.tex(T.paint);
   w.add(smoothUnion2(w), (x, y, z) => (Math.abs(x) > 13.4 ? PAL.hullHi : y < 3 ? PAL.hullDeep : plate(0xd9d2bd, x + 16, y, { pw: 32, ph: 14, bolt: false })), M.metal);
   w.carve(S.box([-10, 6, 4], [10, 50, 12]));
-  w.add(S.box([-10, 6, 3], [10, 50, 4]), 0x9ab4c4, M.gloss);                                     // mirror
-  w.add(S.box([-9, 44, 3.9], [-2, 48, 4.1]), 0xe8f4ff, M.glow);                                   // mirror glint
+  w.tex(T.glass).add(S.box([-10, 6, 3], [10, 50, 4]), 0x9ab4c4, M.gloss);                         // mirror
+  w.tex(0);
   for (let i = 0; i < 20; i++) w.add(S.sphere([-11.4 + (i % 2) * 22.8, 8 + Math.floor(i / 2) * 4.4, 5], 0.8), 0xffffff, M.glow); // vanity bulbs
   // hat rack on top
   w.add(S.capsule([-12, 58, 0], [12, 58, 0], 0.6), PAL.chrome, M.metal);
   w.add(S.cone(-7, 0, 58, 64, 3.4, 0.6), 0x8a3fd8, M.solid);                                     // wizard hat
   w.add(S.cyl(0, 0, 2.6, 58, 61), 0x1a1a1a, M.solid); w.add(S.cyl(0, 0, 4, 58, 58.6), 0x1a1a1a, M.solid); // top hat
   w.add(S.ellipsoid([7, 59, 0], [3.4, 1.8, 3.4]), 0xf2b632, M.metal);                            // hard hat
-  stampText(w, 'STYLE', -textWidth('STYLE', 0.8) / 2, 54.6, 8.6, 0.8, PAL.pink, M.glow, 0.6);
-  const body = setGlow(mesh(w), glowMat(0xffe8c8, 1.7));
+  stampText(w, 'STYLE', -textWidth('STYLE', 0.8) / 2, 54.6, 8.6, 0.8, 0xc85a9a, M.solid, 0.6);
+  const body = setGlow(mesh(w), glowMat(0xffe8c8, 2.2));
   g.add(body);
   const hit = hitBox(2, 3.8, 1.4); g.add(hit);
   return { id: 'wardrobe', label: 'Wardrobe Pod', panel: 'wardrobe', group: g, pick: [hit, body], rect: [10.3, 1.6, 11.8, 3.6], anchor: new THREE.Vector3(10.6, 1.7, 2.6), spots: [] };
@@ -365,15 +380,16 @@ function cabinet(): Station {
   const g = new THREE.Group();
   g.position.set(-11.2, 0, -3.6); g.rotation.y = Math.PI / 2;
   const c = grid([-10, 0, -8], [10, 60, 10], 1.5);
-  c.add(S.box([-9.6, 0, -7], [9.6, 58, 7], 1), PAL.hullDark, M.metal);
+  c.tex(T.hull).add(S.box([-9.6, 0, -7], [9.6, 58, 7], 1), PAL.hullDark, M.metal);
+  c.tex(T.paint);
   for (let r = 0; r < 6; r++) for (let k = 0; k < 2; k++) {
     const y = 3 + r * 9, x0 = -8.6 + k * 8.8;
     c.add(S.box([x0, y, 6], [x0 + 8.2, y + 8, 8], 0.5), (x, yy) => (yy > y + 6 && yy < y + 7.2 && Math.abs(x - x0 - 4.1) < 1.6 ? PAL.chrome : [0x4a6a8a, 0x6a8a4a, 0x8a6a4a][(r + k) % 3]), M.metal);
-    c.add(S.box([x0 + 1, y + 2, 8], [x0 + 3, y + 3.4, 8.4]), [PAL.pink, PAL.cyan, PAL.amber, PAL.glob][(r * 2 + k) % 4], M.glow);
+    c.add(S.box([x0 + 1, y + 2, 8], [x0 + 3.4, y + 3.4, 8.4]), 0xefe2b8, M.solid);
   }
   // overflowing folders on top
   for (let i = 0; i < 5; i++) c.add(S.box([-7 + i * 3, 58, -4 + (i % 2)], [-4.6 + i * 3, 64 - (i % 3), 3]), [0xefe2b8, 0xf6c8a0, 0xd8f0c8][i % 3], M.solid);
-  const body = setGlow(mesh(c), glowMat(0xffffff, 1.6));
+  const body = mesh(c);
   g.add(body);
   const hit = hitBox(1.3, 4, 1.2); g.add(hit);
   const spots: Spot[] = [{ id: 'cabinet', station: 'cabinet', pos: new THREE.Vector3(-10.1, 0, -3.6), face: -Math.PI / 2, anim: 'carry' }];
@@ -385,7 +401,8 @@ function research(): Station {
   const g = new THREE.Group();
   const s = grid([-10, 0, -20], [10, 64, 34], 1.5);
   // data shelves (world x -11.9..-10.7, z -0.4..2.0) → local, built facing +x via rotation later
-  s.add(S.box([-9, 0, -4], [9, 56, 6]), PAL.hullDark, M.metal);
+  s.tex(T.hull).add(S.box([-9, 0, -4], [9, 56, 6]), PAL.hullDark, M.metal);
+  s.tex(0);
   for (let r = 0; r < 5; r++) {
     const y = 4 + r * 10.4;
     s.add(S.box([-8.4, y, -3], [8.4, y + 1, 6]), PAL.steel, M.metal);
@@ -406,10 +423,10 @@ function research(): Station {
   t.add(S.capsule([-1, 30, 1], [-3, 26, 4], 0.9), PAL.hullDark, M.metal);                                  // eyepiece
   t.add(S.box([3, 16, 3], [9, 22, 5], 0.4), PAL.hullDeep, M.metal);                                         // readout box
   t.add(S.box([4, 17, 5], [8, 21, 5.4]), 0x0a2a1a, M.glow);
-  const scope = setGlow(mesh(t), glowMat(PAL.cyan, 1.7));
+  const scope = setGlow(mesh(t), glowMat(0xa8e8ff, 1.0));
   sc.add(scope);
   sc.position.set(-11.0, 0, -1.7);
-  const shelves = setGlow(mesh(s), glowMat(0xd8fff8, 1.7));
+  const shelves = setGlow(mesh(s), glowMat(0xd8fff8, 0.9));
   shelves.position.set(-11.3, 0, 0.8); shelves.rotation.y = Math.PI / 2;
   g.add(shelves, sc);
   const hit = hitBox(1.2, 3.6, 2.4); hit.position.set(-11.3, 0, 0.8); g.add(hit);
@@ -429,21 +446,24 @@ function cloningVat(fx: Particles): Station & { spawnPoint: THREE.Vector3; flash
   g.position.set(-9.3, 0, -6.4);
   const v = grid([-20, 0, -16], [20, 72, 14], 1.5);
   const pod = (cx: number) => {
+    v.tex(T.plateBig);
     v.add(S.cyl(cx, 0, 9, 0, 6), (x, y, z) => (y > 4.6 ? PAL.hullHi : hazard(Math.atan2(z, x - cx) * 8, y, 2)), M.metal);
     v.add(S.cyl(cx, 0, 9, 58, 66), (x, y, z) => plate(PAL.hullDark, Math.atan2(z, x - cx) * 10, y, { pw: 6, ph: 8 }), M.metal);
     v.add(S.cone(cx, 0, 66, 70, 6, 2), PAL.steelDark, M.metal);
-    v.add(S.cyl(cx, 0, 8, 6, 58), PAL.glass, M.glass);
+    v.tex(T.glass).add(S.cyl(cx, 0, 8, 6, 58), PAL.glass, M.glass);
     v.carve(S.cyl(cx, 0, 7.2, 6, 58));
+    v.tex(T.pipe);
     for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4; v.add(S.box([cx + Math.cos(a) * 8.6 - 0.8, 6, Math.sin(a) * 8.6 - 0.8], [cx + Math.cos(a) * 8.6 + 0.8, 58, Math.sin(a) * 8.6 + 0.8]), PAL.steel, M.metal); }
-    v.add(S.cyl(cx, 0, 6.8, 6, 46), (x, y, z) => (Math.sin(y * 0.5 + Math.atan2(z, x - cx) * 2) > 0.85 ? 0xffffff : 0x7fe87a), M.glow);
+    v.tex(0).add(S.cyl(cx, 0, 6.8, 6, 46), (x, y, z) => (Math.sin(y * 0.5 + Math.atan2(z, x - cx) * 2) > 0.85 ? 0xd8ffd0 : 0x6fc87a), M.glow);
   };
   pod(-9); pod(9);
   // control console between pods
-  v.add(S.box([-4, 0, 2], [4, 22, 10], 0.8), PAL.hullDark, M.metal);
+  v.tex(T.console).add(S.box([-4, 0, 2], [4, 22, 10], 0.8), PAL.hullDark, M.metal);
+  v.tex(0);
   v.add(S.box([-3.4, 16, 9.4], [3.4, 21, 10.2]), (x, y) => ((Math.floor(x) + Math.floor(y)) % 3 === 0 ? 0xffffff : 0x1a4a2a), M.glow);
   v.add(S.capsule([-2, 23, 6], [-2, 26, 7], 0.5), PAL.chrome, M.metal); v.add(S.sphere([-2, 26.6, 7], 1), PAL.red, M.jelly);
-  stampText(v, 'CLONE', -textWidth('CLONE', 0.7) / 2, 13, 10, 0.7, PAL.glob, M.glow, 0.5);
-  const liquidMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1, 1.25, 1), toneMapped: false, transparent: true, opacity: 0.6, depthWrite: false });
+  stampText(v, 'CLONE', -textWidth('CLONE', 0.7) / 2, 13, 10, 0.7, PAL.hazardY, M.solid, 0.5);
+  const liquidMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(0.85, 1.0, 0.85), toneMapped: false, transparent: true, opacity: 0.62, depthWrite: false });
   const body = mesh(v);
   body.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = liquidMat; m.renderOrder = 1; } });
   g.add(body);
@@ -455,7 +475,7 @@ function cloningVat(fx: Particles): Station & { spawnPoint: THREE.Vector3; flash
     for (const sx of [-1, 1]) b.add(S.sphere([sx * 1, 0.6, 2.2], 0.8), 0x05070a, M.gloss);
     const bo = mesh(b); bo.position.set(cx * U, 28 * U, 0); g.add(bo); blobs.push(bo);
   }
-  const light = new THREE.PointLight(0x8cf56b, 4, 6, 1.6); light.position.set(0, 2.2, 1.2); g.add(light);
+  const light = new THREE.PointLight(0xb8f0b0, 1.6, 4, 1.8); light.position.set(0, 2.2, 1.2); g.add(light);
   const hit = hitBox(2.4, 4.2, 1.8); g.add(hit);
   let flashT = 0;
   const spawnPoint = new THREE.Vector3(-9.3, 0, -4.7);
@@ -473,8 +493,8 @@ function cloningVat(fx: Particles): Station & { spawnPoint: THREE.Vector3; flash
     },
     update(dt, t) {
       flashT = Math.max(0, flashT - dt * 1.5);
-      light.intensity = 4 + Math.sin(t * 2.3) * 0.8 + flashT * 24;
-      liquidMat.color.setRGB(1 + flashT, 1.25 + flashT, 1 + flashT);
+      light.intensity = 1.6 + Math.sin(t * 2.3) * 0.3 + flashT * 16;
+      liquidMat.color.setRGB(0.85 + flashT, 1.0 + flashT, 0.85 + flashT);
       blobs.forEach((b, i) => { b.position.y = 28 * U + Math.sin(t * 1.3 + i * 2) * 0.12; b.rotation.y = Math.sin(t * 0.7 + i) * 0.8; });
       if (Math.random() < dt * 6) fx.emit({ tile: 'bubble', pos: [-9.3 + (Math.random() < 0.5 ? -9 : 9) * U + (Math.random() - 0.5) * 0.6, 0.5, -6.4 + (Math.random() - 0.5) * 0.6], vel: [0, 0.8, 0], life: 2.2, size: 0.05, color: '#e8ffe0', wobble: 0.2 });
     },
@@ -486,20 +506,22 @@ function whiteboard(): Station {
   const g = new THREE.Group();
   g.position.set(5.4, 0, -7.6);
   const b = grid([-26, 0, -4], [26, 62, 4], 1.5);
+  b.tex(T.paint);
   b.add(S.box([-24, 18, -3], [24, 56, 0], 1), (x, y) => (Math.min(x + 24, 24 - x, y - 18, 56 - y) < 2.2 ? PAL.hullHi : 0x132028), M.metal);
   for (const sx of [-1, 1]) b.add(S.box([sx * 20 - 1, 0, -3], [sx * 20 + 1, 18, -1]), PAL.steelDark, M.metal);
   // voxel sticky notes
   const notes: [number, number, number][] = [[-19, 49, PAL.amber], [-12, 49, PAL.pink], [-5, 49, PAL.cyan], [-19, 41, PAL.glob], [-12, 41, PAL.amber], [-19, 33, PAL.pink]];
   for (const [x, y, c] of notes) { b.add(S.box([x, y - 5, 0], [x + 6, y + 1, 0.6]), c, M.solid); for (let i = 0; i < 3; i++) b.add(S.box([x + 1, y - 1 - i * 1.4, 0.6], [x + 5 - i, y - 0.6 - i * 1.4, 0.8]), shade(c, 0.5), M.solid); }
-  stampText(b, 'PLAN', 6, 54.4, 0, 0.9, PAL.cyan, M.glow, 0.5);
+  b.tex(0);
+  stampText(b, 'PLAN', 6, 54.4, 0, 0.9, 0xd8e8f0, M.solid, 0.5);
   b.add(S.box([4, 22, 0], [22, 23, 0.4]), PAL.hullHi, M.metal);
-  const body = setGlow(mesh(b), glowMat(0xd8fbff, 1.8));
+  const body = mesh(b);
   g.add(body);
   // holo task bars (driven by project tasks)
   const bars = new VoxBars(1, 1, 1, PAL.cyan, 1.8);
   void bars;
   const rows: THREE.Mesh[] = [];
-  const rowMat = [glowMat(PAL.glob, 1.6), glowMat(PAL.amber, 1.6), glowMat(0x3a4a52, 1)];
+  const rowMat = [glowMat(0x8ad8a0, 0.95), glowMat(0xe8b060, 0.95), glowMat(0x3a4a52, 1)];
   for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2 * U, 0.6 * U), rowMat[2]); m.position.set(13 * U, (48 - i * 4) * U, 0.4 * U); g.add(m); rows.push(m); }
   const hit = hitBox(3, 2.6, 0.5, 2.3); g.add(hit);
   let acc = 0;
@@ -524,8 +546,11 @@ function workbench(fx: Particles): Station & { zap(): void } {
   const g = new THREE.Group();
   g.position.set(5.8, 0, 1.5);
   const w = grid([-24, 0, -11], [24, 40, 11], 1.5);
+  w.tex(T.wood);
   w.add(S.box([-22, 13, -9], [22, 16, 9], 0.6), (x, _y, z) => plate(0x6a5a4a, x + 22, z + 9, { pw: 11, ph: 18, bolt: false }), M.solid);
+  w.tex(T.plateBig);
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) w.add(S.box([sx * 20 - 1.4, 0, sz * 7 - 1.4], [sx * 20 + 1.4, 13, sz * 7 + 1.4]), PAL.steelDark, M.metal);
+  w.tex(T.paint);
   w.add(S.box([-20, 4, -8], [20, 5.4, 8]), PAL.steelDark, M.metal);
   w.add(S.box([-18, 5.4, -6], [-6, 11, 6], 0.6), PAL.paintRed, M.metal);                          // tool chest
   for (let i = 0; i < 3; i++) w.add(S.box([-17.4, 6 + i * 1.8, 6], [-6.6, 7.4 + i * 1.8, 6.4]), PAL.chrome, M.metal);
@@ -540,7 +565,7 @@ function workbench(fx: Particles): Station & { zap(): void } {
   w.add(S.capsule([15, 26, 0], [15, 31, 0], 0.5), PAL.chrome, M.metal); w.add(S.sphere([15, 31.6, 0], 1.1), PAL.amber, M.glow);
   // vise
   w.add(S.box([4, 16, 3], [8, 19, 7]), PAL.steel, M.metal);
-  const body = setGlow(mesh(w), glowMat(0xffe8b0, 1.6));
+  const body = setGlow(mesh(w), glowMat(0xffe8b0, 1.0));
   g.add(body);
   const hit = hitBox(2.8, 2, 1.2); g.add(hit);
   return {

@@ -24,6 +24,8 @@ import '../ui/shop/shop.css';
 import '../ui/idea/idea.css';
 import './widget.css';
 import { ModalHost } from '../ui/common/kit';
+import { unlock } from '../economy/achievements';
+const SIZE: Record<string, string> = { shop: 'lg', slot: 'md', arcade: 'md', achievements: 'md', idea: 'xl' };
 
 const C: Record<string, any> = { shop: Shop, slot: SlotPanel, arcade: ArcadePanel, achievements: AchievementsPanel, idea: IdeaLab };
 
@@ -32,13 +34,13 @@ const C: Record<string, any> = { shop: Shop, slot: SlotPanel, arcade: ArcadePane
   startCrewDirector();
   const q = new URLSearchParams(location.search);
   const panel = q.get('panel') ?? 'shop';
-  (window as any).__h = { setPanel };
-  const el = document.getElementById('app')!;
+  (window as any).__h = { setPanel, unlock };
+  const el = document.getElementById('harness')!;
   if (panel === 'widget') {
     el.style.cssText = 'position:fixed;left:12px;top:12px;width:360px;height:270px;border-radius:16px;overflow:hidden';
     render(h(Widget, { win: window, onHome: () => {} }), el);
   } else {
-    render(h('div', { style: 'display:grid;place-items:center;height:100%' }, h('div', { style: 'width:100%;height:100%;max-width:1180px;display:flex' }, h(C[panel], { arg: null, close: () => {} })), h(ModalHost, {})), el);
+    render(h('div', null, h('div', { class: `panel-host size-${SIZE[panel] ?? 'lg'}`, style: 'top:12px;bottom:12px' }, h(C[panel], { arg: null, close: () => {} })), h(ModalHost, {})), el);
   }
   document.getElementById('boot')?.remove();
   (window as any).__ready = true;

@@ -100,7 +100,7 @@ function clearBody(g: VoxGrid, cat: boolean) {
 
 /** the arm nub (arm frame) — mirrors alien.ts buildArm */
 function armShape(cat: boolean, raisedPaw: boolean): Shape {
-  if (cat && raisedPaw) return union(S.capsule([0, 0, 0], [0.6, 6.2, 1.8], 3.5, 3.9), S.ellipsoid([0.7, 9.2, 2.6], [5.2, 4.8, 4.4]));
+  if (cat && raisedPaw) return union(S.capsule([0, 0, 0], [0.8, -5.6, 2.2], 3.4, 3.8), S.capsule([0.8, -5.6, 2.2], [2.2, -1.6, 4.6], 3.8, 4.1), S.ellipsoid([2.4, 1.2, 6.8], [4.9, 4.7, 3.2]));
   if (cat) return union(S.capsule([0, 0, 0], [0, -4, 2], 3.2, 3.5), S.ellipsoid([0, -5.4, 2.6], [3.8, 3.2, 3.6]));
   return S.ellipsoid([0, -3, 2], [3.1, 3.4, 3.1]);
 }
@@ -110,10 +110,10 @@ function sleeves(cat: boolean, color: (x: number, y: number, z: number) => numbe
   for (const side of ['armL', 'armR'] as const) {
     const raised = cat && side === 'armR';
     const arm = armShape(cat, raised);
-    const sl = inter(shell(arm, -0.25, 1.05), raised ? (_x, y) => y - 4.2 : (_x, y) => (cat ? -3.4 : -3.2) - y);
+    const sl = inter(shell(arm, -0.25, 1.05), raised ? (x, y, z) => 5.6 - Math.hypot(x - 2.4, y - 1.2, z - 6.8) : (_x, y) => (cat ? -3.4 : -3.2) - y);
     const g = gridFor(sl);
     g.add(sl, (x, y, z) => {
-      const edge = raised ? y > 3.2 : y < (cat ? -2.4 : -2.2);
+      const edge = raised ? Math.hypot(x - 2.4, y - 1.2, z - 6.8) < 6.6 : y < (cat ? -2.4 : -2.2);
       return cuff !== undefined && edge ? cuff : color(x, y, z);
     }, mat);
     g.carve(grow(arm, -0.25));

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { AlienLook, Expression } from '../core/types';
 import { buildAlien, type AlienParts, type Face } from '../vox/alien';
-import { dressAlien, buildHeldItem } from '../vox/cosmetics';
+import { dressAlien, buildHeldItem, animateCosmetics } from '../vox/cosmetics';
 import type { Anim } from './stations';
 
 export type HandItem = 'hammer' | 'wrench' | 'magnifier' | 'box' | 'mug' | 'chalk' | null;
@@ -207,9 +207,8 @@ export class Alien {
       P.antR.rotation.z = -0.28 - Math.sin(t * 2.3) * 0.06 - (this.moving ? Math.sin(this.phase * 2) * 0.1 : 0);
     }
     if (P.tail) P.tail.rotation.y = Math.sin(t * 2.2 + this.seed) * 0.45;
-    // cosmetic motion hooks (named by the cosmetics module)
-    const prop = P.root.getObjectByName('prop'); if (prop) prop.rotation.y += dt * (a === 'type' || this.moving ? 30 : 8);
-    const cape = P.root.getObjectByName('cape'); if (cape) cape.rotation.x = 0.1 + (this.moving ? 0.45 : 0.05) + Math.sin(t * 4) * 0.06;
+    // cosmetics: propeller spin, cape sway, halo bob, jetpack flames (faster when busy / moving)
+    animateCosmetics(P.root, t, dt, this.moving || a === 'type' ? 3 : 1);
 
     const squash = Math.max(-0.35, Math.min(0.35, this.sq));
     P.jelly.position.y = y;

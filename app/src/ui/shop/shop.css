@@ -1,6 +1,5 @@
 /* GENE-O-MAT, Wardrobe, Slots, Arcade, Achievements — station styling */
 
-.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }
 
 /* ── vending machine ─────────────────────────────────────────────────────── */
 .vend { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 12px; min-height: 0; flex: 1; }
@@ -19,9 +18,9 @@
   background: linear-gradient(180deg, #e8c46a, #b8862e 55%, #8a5f18); color: #2a1a02; font: 700 12px var(--font-display); letter-spacing: .04em;
   box-shadow: inset 0 1px 0 #fff3c0, inset 0 -2px 0 #6a440c, 0 3px 0 #0008; }
 .vend-slot .plaque .ico { filter: drop-shadow(0 1px 0 #fff8); }
-.vend-slot .nm-hover { position: absolute; left: 50%; top: 4px; transform: translate(-50%, -6px) scale(.9); opacity: 0; pointer-events: none; z-index: 4; white-space: nowrap; max-width: 150%;
+.vend-slot .nm-hover { position: absolute; left: 50%; top: 8px; transform: translate(-50%, 6px) scale(.9); opacity: 0; pointer-events: none; z-index: 4; white-space: nowrap; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis;
   padding: 4px 9px; border-radius: 9px; background: #050a07ee; color: var(--text); font: 600 12px var(--font-display); box-shadow: 0 0 0 1px var(--rar), 0 6px 16px #000c; transition: opacity .15s, transform .25s var(--ease-jelly); }
-.vend-slot:hover .nm-hover, .vend-slot:focus-visible .nm-hover { opacity: 1; transform: translate(-50%, -12px) scale(1); }
+.vend-slot:hover .nm-hover, .vend-slot:focus-visible .nm-hover { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .vend-slot .owned { position: absolute; top: 8px; right: 8px; z-index: 3; display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 10px; font: 700 11px var(--font-display); color: #062a08; background: radial-gradient(circle at 35% 30%, #c8ffb0, var(--glob) 60%, var(--glob-deep)); box-shadow: 0 2px 0 #062a08, 0 0 10px #8cf56b88; }
 .vend-slot.r-legendary::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(110deg, transparent 30%, #ffe9a81c 45%, transparent 60%); background-size: 250% 100%; animation: shimmer 3s linear infinite; }
 .vend-slot.dropping .thumb { animation: vend-drop .7s var(--ease-out); }

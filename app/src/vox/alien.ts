@@ -218,7 +218,7 @@ export function antennaClearance(): { a: V3; b: V3; r: number }[] {
 /** Cat ear keep-out ellipsoids in the head frame. */
 export const CAT_EARS: { c: V3; r: V3 }[] = [{ c: [-10.4, 12.6, -2.2], r: [6.2, 6, 3.4] }, { c: [10.4, 12.6, -2.2], r: [6.2, 6, 3.4] }];
 /** where the arm pivots sit (feet-origin frame), for sleeves */
-export const ARM_PIVOT = { glob: [6.4, 14.5, 3] as V3, cat: [6.6, 15.5, 4.2] as V3 };
+export const ARM_PIVOT = { glob: [6.4, 14.5, 3] as V3, cat: [7.4, 15.2, 2.6] as V3 };
 
 // ── part builders ────────────────────────────────────────────────────────────
 function headColor(p: Pal, x: number, y: number, z: number) {
@@ -264,6 +264,56 @@ function spot(x: number, y: number, z: number, cell: number, r: number, seed = 4
   return n.d < cell * r * (0.75 + 0.5 * n.h);
 }
 
+
+// Surface-placed markings: centres are Poisson-sampled ON the part's surface so every
+// rosette slices into a clean ring (no partial specks), each with its own C-gap angle.
+interface Mark { c: V3; n: V3; r: number; gap: number }
+function sampleEllipsoid(c: V3, r: V3, count: number, minDist: number, seed: number, keep: (p: V3, n: V3) => boolean, rMin: number, rMax: number): Mark[] {
+  const out: Mark[] = [];
+  for (let i = 0; i < count * 40 && out.length < count; i++) {
+    const u = hash3(i, 1, seed) * 2 - 1, th = hash3(i, 2, seed) * Math.PI * 2;
+    const s = Math.sqrt(1 - u * u);
+    const d: V3 = [s * Math.cos(th), u, s * Math.sin(th)];
+    const p: V3 = [c[0] + d[0] * r[0], c[1] + d[1] * r[1], c[2] + d[2] * r[2]];
+    const nn: V3 = [d[0] / r[0], d[1] / r[1], d[2] / r[2]];
+    const nl = Math.hypot(nn[0], nn[1], nn[2]); const n: V3 = [nn[0] / nl, nn[1] / nl, nn[2] / nl];
+    if (!keep(p, n)) continue;
+    if (out.some((m) => Math.hypot(m.c[0] - p[0], m.c[1] - p[1], m.c[2] - p[2]) < minDist)) continue;
+    out.push({ c: p, n, r: rMin + hash3(i, 3, seed) * (rMax - rMin), gap: hash3(i, 4, seed) * Math.PI * 2 });
+  }
+  return out;
+}
+function nearestMark(marks: Mark[], x: number, y: number, z: number) {
+  let best: Mark | null = null, bd = Infinity;
+  for (const m of marks) { const d = (x - m.c[0]) ** 2 + (y - m.c[1]) ** 2 + (z - m.c[2]) ** 2; if (d < bd) { bd = d; best = m; } }
+  return best ? { m: best, d: Math.sqrt(bd) } : null;
+}
+/** open ring / broken-C rosette with a smoky centre */
+function rosetteAt(marks: Mark[], x: number, y: number, z: number): 'ring' | 'smoke' | null {
+  const hit = nearestMark(marks, x, y, z);
+  if (!hit || hit.d > hit.m.r) return null;
+  if (hit.d < hit.m.r * 0.56) return 'smoke';
+  const { m } = hit;
+  const up: V3 = Math.abs(m.n[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const ux = up[1] * m.n[2] - up[2] * m.n[1], uy = up[2] * m.n[0] - up[0] * m.n[2], uz = up[0] * m.n[1] - up[1] * m.n[0];
+  const ul = Math.hypot(ux, uy, uz) || 1;
+  const vx = m.n[1] * uz - m.n[2] * uy, vy = m.n[2] * ux - m.n[0] * uz, vz = m.n[0] * uy - m.n[1] * ux;
+  const dx = x - m.c[0], dy = y - m.c[1], dz = z - m.c[2];
+  const a = Math.atan2((dx * vx + dy * vy + dz * vz) / ul, (dx * ux + dy * uy + dz * uz) / ul);
+  return Math.cos(a - m.gap) > 0.7 ? null : 'ring'; // one open side → a C
+}
+let BODY_MARKS: Mark[] | null = null, HEAD_DOTS: Mark[] | null = null, TAIL_MARKS: Mark[] | null = null;
+function bodyMarks() {
+  return (BODY_MARKS ??= sampleEllipsoid([0, 11.5, 0], [8.6, 9.6, 7.6], 34, 4.3, 101,
+    (p) => !(p[2] > 2.5 && Math.abs(p[0]) < 6 && p[1] < 18) && p[1] > 2.5, 1.15, 1.85));
+}
+function headDots() {
+  if (HEAD_DOTS) return HEAD_DOTS;
+  const crown = sampleEllipsoid([0, 0, 0], [17.5, 15.4, 15.6], 60, 2.2, 202, (p) => p[1] > 5.5 && p[2] > -3 && Math.hypot(p[0] / 11, (p[1] - 11) / 7) < 1, 0.78, 1.0);
+  const rest = sampleEllipsoid([0, 0, 0], [17.5, 15.4, 15.6], 34, 4.2, 203, (p) => (p[2] < 6 || Math.abs(p[0]) > 14) && p[1] > -9 && !(p[1] > 5.5 && p[2] > -3 && Math.abs(p[0]) < 11), 0.9, 1.25);
+  return (HEAD_DOTS = [...crown, ...rest]);
+}
+
 type FurRegion = 'head' | 'body' | 'limb' | 'tail' | 'ear';
 /** Snow-leopard fur colour. Coordinates in the PART's own frame (head: head-centred). */
 function catFur(p: Pal, x: number, y: number, z: number, region: FurRegion = 'body'): number {
@@ -272,29 +322,23 @@ function catFur(p: Pal, x: number, y: number, z: number, region: FurRegion = 'bo
   if (region === 'head') {
     const base = shadeY(0xcdd3da, FUR_HI, (y + 8) / 24);
     const front = z > 7.5;
-    // white muzzle, chin and cheek fluff
-    if (front && y < -2.6 && Math.abs(x) < 11.5) return mix(FUR_HI, 0xffffff, 0.65);
-    // soft grey mask round the eyes and down the nose bridge (like the photo)
+    // white muzzle, cheeks and chin — never spotted
+    if (front && y < -2.6 && Math.abs(x) < 12.5) return mix(FUR_HI, 0xffffff, 0.65);
+    // soft grey mask down the nose bridge
     if (front && y < 6 && y > -2.6 && Math.abs(x) < 2.6) return mix(0xc9cfd6, base, Math.abs(x) / 2.6);
-    // the dense speckle cluster on the forehead (densest at the top centre)
-    if (y > 5 && z > -2) {
-      const k = Math.max(0, 1 - Math.hypot(x / 10, (y - 11) / 8));
-      if (spot(x, y, z, 1.85, 0.2 + k * 0.2, 53)) return SPOT;
-      return base;
-    }
-    // streaky dark spots on the cheeks / sides / back of the head
-    if (!front || Math.abs(x) > 11) { if (spot(x, y, z, 4.6, 0.3, 59, 0.6, 1.5, 0.6)) return ROSETTE; }
+    // clean round dots: a dense cluster on the crown, sparser round the sides/back
+    const hit = nearestMark(headDots(), x, y, z);
+    if (hit && hit.d < hit.m.r) return SPOT;
     return base;
   }
   if (region === 'body') {
     const base = shadeY(FUR_LO, FUR_MID, y / 18);
-    if (z > 3 && Math.abs(x) < 5.5 && y < 17) return mix(FUR_HI, 0xffffff, 0.7); // white chest
-    const r = rosette(x, y, z, 8.2, 7);
-    if (r === 'ring') return ROSETTE; if (r === 'smoke') return mix(base, SMOKE, 0.45);
-    if (spot(x, y, z, 4.4, 0.24, 83, 0.55, 1.6, 0.55)) return ROSETTE;
+    if (z > 2.5 && Math.abs(x) < 6 && y < 18) return mix(FUR_HI, 0xffffff, 0.7); // white chest & belly
+    const r = rosetteAt(bodyMarks(), x, y, z);
+    if (r === 'ring') return 0x3a3b42; if (r === 'smoke') return mix(base, 0xa9b0b9, 0.6);
     return base;
   }
-  if (region === 'limb') return spot(x, y, z, 2.8, 0.26, 61) ? SPOT : FUR_MID;
+  if (region === 'limb') return FUR_MID;
   if (region === 'ear') return FUR_MID;
   return FUR_MID;
 }
@@ -392,15 +436,28 @@ function buildBody(p: Pal) {
 function buildArm(p: Pal, paw: boolean) {
   const g = VoxGrid.span([-10, -11, -7], [8, 17, 16], ALIEN_RES);
   if (p.cat && paw) {
-    // the snow leopard's RAISED paw: reaching forward in front of the chin, beans facing the viewer
-    const fur = (x: number, y: number, z: number) => (z > 6.5 ? mix(FUR_HI, 0xffffff, 0.6) : catFur(p, x, y, z, 'limb'));
-    const P: V3 = [-2.4, 5.4, 10];
-    g.add(S.capsule([0, 0, 0], [-1.6, 3.6, 5.6], 3.4, 3.7), fur, M.fur);
-    g.add(S.ellipsoid(P, [5.2, 5.0, 3.6]), fur, M.fur);
-    for (const tx of [-3.3, -1.15, 1.15, 3.3]) g.add(S.sphere([P[0] + tx, P[1] + 3.8 - Math.abs(tx) * 0.4, P[2] + 0.6], 1.7), fur, M.fur);
-    // big main pad + four toe beans on the front face
-    g.paint(S.ellipsoid([P[0], P[1] - 1.1, P[2] + 3.4], [2.6, 2.1, 1.6]), 0x16171c, M.gloss);
-    for (const [bx, by] of [[-3.3, 2.5], [-1.15, 3.7], [1.15, 3.7], [3.3, 2.5]] as const) g.paint(S.ellipsoid([P[0] + bx, P[1] + by, P[2] + 3.2], [0.95, 1.05, 1.6]), 0x16171c, M.gloss);
+    // The raised paw, after the photo: a thick fluffy forearm rising from the side of the
+    // body to a palm held up in front of the chest (viewer's right, below the cheek),
+    // palm to the viewer: one big rounded pad with four round toe beans in an arc above it.
+    const fur = (x: number, y: number, z: number) => (z > 5 ? mix(FUR_HI, 0xffffff, 0.55) : mix(FUR_MID, FUR_HI, 0.5));
+    const elbow: V3 = [0.8, -5.6, 2.2];
+    const P: V3 = [2.4, 1.2, 6.8];              // palm centre (arm frame)
+    g.add(S.capsule([0, 0, 0], elbow, 3.4, 3.8), fur, M.fur);              // upper arm down the side
+    g.add(S.capsule(elbow, [P[0] - 0.2, P[1] - 2.8, P[2] - 2.2], 3.8, 4.1), fur, M.fur);  // forearm rising forward
+    for (let i = 0; i < 6; i++) {                                          // fluffy tufts along the forearm
+      const t = i / 5, q: V3 = [elbow[0] + (P[0] - elbow[0]) * t * 0.8, elbow[1] + (P[1] - 2.8 - elbow[1]) * t, elbow[2] + (P[2] - 2.2 - elbow[2]) * t];
+      g.add(S.sphere([q[0] + 3.2, q[1], q[2] - 0.4], 1.5), fur, M.fur);
+      g.add(S.sphere([q[0] - 3.1, q[1] + 0.4, q[2] - 0.2], 1.4), fur, M.fur);
+    }
+    g.add(S.ellipsoid(P, [4.9, 4.7, 3.2]), fur, M.fur);                      // the paw itself
+    for (const [tx, ty] of [[-3.1, 2.4], [-1.1, 3.6], [1.1, 3.6], [3.1, 2.4]] as const) g.add(S.sphere([P[0] + tx, P[1] + ty, P[2] + 0.6], 1.75), fur, M.fur); // toe lumps
+    const pad = 0x2a2b31;
+    // the main pad: a rounded three-lobed cushion, wider at the bottom, sitting proud of the fur
+    g.add(S.ellipsoid([P[0], P[1] - 1.3, P[2] + 2.6], [2.0, 1.5, 1.0]), pad, M.gloss);
+    g.add(S.ellipsoid([P[0] - 1.35, P[1] - 1.9, P[2] + 2.45], [1.25, 1.05, 0.95]), pad, M.gloss);
+    g.add(S.ellipsoid([P[0] + 1.35, P[1] - 1.9, P[2] + 2.45], [1.25, 1.05, 0.95]), pad, M.gloss);
+    // four round toe beans, separate, in an arc above the pad (each on its own toe lump)
+    for (const [bx, by] of [[-3.1, 2.2], [-1.1, 3.5], [1.1, 3.5], [3.1, 2.2]] as const) g.add(S.sphere([P[0] + bx, P[1] + by, P[2] + 2.25], 0.85), pad, M.gloss);
     return g;
   }
   if (p.cat) {
@@ -441,6 +498,21 @@ function buildAntenna(p: Pal, side: number, bulb: number) {
   return g;
 }
 
+function tailMarks(pts: V3[]): Mark[] {
+  if (TAIL_MARKS) return TAIL_MARKS;
+  const out: Mark[] = [];
+  for (let i = 0; i < 6; i++) {
+    const seg = i % 2, t = 0.25 + (i >> 1) * 0.3;
+    const a = pts[seg], b = pts[seg + 1];
+    const c: V3 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    const ang = hash3(i, 7, 9) * Math.PI * 2;
+    const n: V3 = [Math.cos(ang), 0.2, Math.sin(ang)];
+    const nl = Math.hypot(...n);
+    out.push({ c: [c[0] + (n[0] / nl) * 3.6, c[1] + (n[1] / nl) * 3.6, c[2] + (n[2] / nl) * 3.6], n: [n[0] / nl, n[1] / nl, n[2] / nl], r: 1.3, gap: ang });
+  }
+  return (TAIL_MARKS = out);
+}
+
 function buildTail(p: Pal) {
   void p;
   const g = VoxGrid.span([-14, -5, -20], [14, 26, 6], ALIEN_RES);
@@ -463,9 +535,9 @@ function buildTail(p: Pal) {
   };
   const col = (x: number, y: number, z: number) => {
     const t = along(x, y, z);
-    if (t > 0.9) return ROSETTE;                                   // dark tip
-    if (t > 0.3 && Math.floor(t * 9) % 2 === 1) return ROSETTE;     // rings toward the end
-    if (t <= 0.3) { const r = rosette(x, y, z, 5, 77); if (r === 'ring') return ROSETTE; if (r === 'smoke') return mix(FUR_MID, SMOKE, 0.5); }
+    if (t > 0.88) return 0x2e2f35;                                    // dark tip
+    if (t > 0.34 && (t * 7.5) % 1 < 0.42) return 0x34353b;             // thick dark rings toward the end
+    if (t <= 0.34) { const r = rosetteAt(tailMarks(pts), x, y, z); if (r === 'ring') return 0x3a3b42; if (r === 'smoke') return mix(FUR_MID, 0xa9b0b9, 0.6); }
     return FUR_MID;
   };
   for (let i = 0; i < pts.length - 1; i++) g.add(S.capsule(pts[i], pts[i + 1], 3.6 + i * 0.05, 3.7 + i * 0.05), col, M.fur);
@@ -535,7 +607,7 @@ export function buildAlien(look: AlienLook, size = 0.016): AlienParts {
     const paw = !!p.cat && sx === 1;
     g.add(part(key + (paw ? '|paw' : '|arm'), () => toObject(buildArm(p, paw), opts('arm'))));
     g.position.set(V(sx * 6.4), V(14.5), V(3));
-    if (paw) { g.position.set(V(6.6), V(15.5), V(4.2)); }
+    if (paw) { g.position.set(V(7.4), V(15.2), V(2.6)); }
     jelly.add(g);
   }
 

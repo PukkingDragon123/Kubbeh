@@ -162,3 +162,5 @@
 .slot-cab, .arcade-cab { box-shadow: 0 0 0 4px #0a0e14, inset 0 4px 0 #ffffff33, inset 0 -6px 0 #0006, 0 6px 0 #04070bcc; }
 .reel { box-shadow: 0 0 0 2px #0a0e14, inset 0 4px 0 #0003, inset 0 -4px 0 #0003; }
 .station-btn:hover { transform: translateY(-2px); }
+.vend-slot { border: 8px solid transparent; border-image: var(--px-card) 4 / 8px / 0 repeat; image-rendering: pixelated; }
+.vend-slot:hover { transform: translateY(-2px); }

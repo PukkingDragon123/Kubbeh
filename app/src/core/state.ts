@@ -42,7 +42,7 @@ export const DEFAULT_LOOKS: AlienLook[] = [
   { id: 'blip', name: 'Blip', skin: 'glob', body: '#6fe0a0', belly: '#c4ffe0', eyes: '#173a9e', bulbA: '#ffe14d', bulbB: '#ff7ad9', hat: 'hardhat', expression: 'focused', quirk: 'bouncy' },
   { id: 'mossy', name: 'Mossy', skin: 'glob', body: '#9be255', belly: '#dbff9e', eyes: '#3a1b8f', bulbA: '#59f0ff', bulbB: '#59f0ff', accessory: 'headphones', expression: 'sleepy', quirk: 'sleepy' },
   { id: 'zib', name: 'Zib', skin: 'glob', body: '#5fd36b', belly: '#a8f0b0', eyes: '#0f4fa8', bulbA: '#ff5e5e', bulbB: '#ffa24d', accessory: 'bowtie', expression: 'derp', quirk: 'chaotic' },
-  { id: 'pounce', name: 'Pounce', skin: 'pounce', body: '#e9edf0', belly: '#ffffff', eyes: '#111111', bulbA: '#c9d3da', bulbB: '#c9d3da', expression: 'love', quirk: 'shy' },
+  { id: 'pounce', name: 'Pounce', skin: 'pounce', body: '#e9edf0', belly: '#ffffff', eyes: '#111111', bulbA: '#c9d3da', bulbB: '#c9d3da', expression: 'happy', quirk: 'shy' },
 ];
 
 export const DEFAULT_ECONOMY: EconomyState = {

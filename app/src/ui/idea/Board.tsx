@@ -6,6 +6,9 @@ import { estimateTokens, fmtUsd, pick } from '../../core/util';
 import type { DesignDoc } from '../../core/types';
 import { Btn, Meter, Seg, Toggle, copyText } from '../common/kit';
 import { Icon } from '../common/icons';
+import { VoxView } from '../shop/vox/VoxView';
+import { framed } from '../shop/vox/models';
+import { buildGlyph, type GlyphName } from '../shop/vox/glyphs';
 import { SECTIONS, applyPatch, coverage, docAsBrief, fill, saveDoc, type Section } from './doc';
 import { FAMILY_COLOR, MECHANICS, type Family, type Mechanic } from './mechanics';
 import { DETAIL_LEVELS, TARGETS, finalPromptSystem, type Target } from './prompts';
@@ -124,7 +127,7 @@ export function MixerTab({ doc, onFuse }: { doc: DesignDoc; onFuse: (picked: Mec
         {bubbles.map((b, i) => <i key={i} class="bub" style={{ left: b.left, animationDelay: b.delay, width: `${b.size}px`, height: `${b.size}px` }} />)}
         <div class="slots">
           {picked.length === 0 && <span class="dim" style={{ fontSize: '13px' }}>Pick 2–3 mechanic cards below to drop them in the chamber.</span>}
-          {picked.map((m) => <span key={m.name} class="slot" style={{ ['--fam' as any]: FAMILY_COLOR[m.family] }}>{m.name}<button type="button" class="btn ghost sm icon" style={{ minHeight: '20px', width: '20px', borderRadius: '6px' }} aria-label={`Remove ${m.name}`} onClick={() => toggle(m)}><Icon name="close" size="sm" /></button></span>)}
+          {picked.map((m) => <span key={m.name} class="slot" style={{ ['--fam' as any]: FAMILY_COLOR[m.family] }}><FamilyGlyph family={m.family} size={26} />{m.name}<button type="button" class="btn ghost sm icon" style={{ minHeight: '20px', width: '20px', borderRadius: '6px' }} aria-label={`Remove ${m.name}`} onClick={() => toggle(m)}><Icon name="close" size="sm" /></button></span>)}
         </div>
         <div class="row wrap gap-8" style={{ position: 'relative', zIndex: 1, marginTop: 'auto' }}>
           <Btn tone="glob" icon="bolt" disabled={picked.length < 2} onClick={() => { sfx('zap', .5); setHot((h) => h + 1); unlock('fusion'); onFuse(picked); setPicked([]); }}>Fuse with Glorp</Btn>
@@ -144,7 +147,8 @@ export function MixerTab({ doc, onFuse }: { doc: DesignDoc; onFuse: (picked: Mec
       <div class="mix-deck">
         {deck.map((m) => (
           <button type="button" key={m.name} class="mcard" aria-pressed={picked.includes(m)} style={{ ['--fam' as any]: FAMILY_COLOR[m.family] }} onClick={() => toggle(m)} onMouseEnter={() => sfx('hover', .08)}>
-            <span class="fam">{m.family}</span><b>{m.name}</b><span class="dim">{m.blurb}</span>
+            <FamilyGlyph family={m.family} size={40} />
+            <span class="mtxt"><b>{m.name}</b><span class="dim">{m.blurb}</span></span>
           </button>
         ))}
       </div>
@@ -244,4 +248,14 @@ export function PromptTab({ doc }: { doc: DesignDoc }) {
       )}
     </>
   );
+}
+
+const FAMILY_GLYPH: Record<Family, GlyphName> = {
+  Movement: 'bolt', Combat: 'sword', Puzzle: 'cube', Economy: 'coin', Building: 'wrench',
+  Progression: 'star', World: 'planet', Narrative: 'chat', Time: 'hourglass', Social: 'heart',
+};
+/** A sculpted voxel icon for a mechanic family (tinted with the family colour). */
+export function FamilyGlyph({ family, size }: { family: Family; size: number }) {
+  const col = parseInt(FAMILY_COLOR[family].slice(1), 16);
+  return <VoxView class="fam-glyph" size={size} spin="hover" cacheKey={`fam:${family}`} make={() => framed(buildGlyph(FAMILY_GLYPH[family], col))} title={family} yaw={-0.35} pitch={0.15} fill={0.98} />;
 }

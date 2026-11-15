@@ -66,7 +66,7 @@ export class CrewController {
       if (!look) continue;
       const alien = new Alien(look, { clone: m.role === 'clone' });
       alien.night = this.night;
-      alien.scaleK = m.role === 'clone' ? 1.05 : 1.3; alien.root.scale.setScalar(m.role === 'clone' ? 0.01 : 1.3);
+      alien.scaleK = m.role === 'clone' ? 0.86 : 1; alien.root.scale.setScalar(m.role === 'clone' ? 0.01 : 1);
       const e: Ent = { id: m.id, alien, member: m, key: '', spot: null, arriveAnim: 'idle', idleT: Math.random() * 3, fxT: 0, arrived: true };
       alien.onImpact = () => this.impact(e);
       // start positions
@@ -239,7 +239,7 @@ export class CrewController {
       e.fxT -= dt;
       if (e.fxT <= 0) {
         e.fxT = 0.9 + Math.random() * 0.6;
-        const top = a.position.clone().setY(1.45 * a.scaleK);
+        const top = a.position.clone().setY(1.4 * a.scaleK);
         const act = this.activityOf(e);
         if (act === 'thinking') this.fx.emit({ tile: Math.random() < 0.5 ? 'question' : 'sparkle', pos: top, vel: [0, 0.5, 0], spread: [0.2, 0.1, 0.2], life: 1.2, size: 0.22, color: '#ffe27a', additive: true });
         else if (act === 'question' && !a.moving) this.fx.emit({ tile: 'bang', pos: top.setY(top.y + 0.1), vel: [0, 0.4, 0], life: 0.9, size: 0.3, color: '#ff6fd6', additive: true });

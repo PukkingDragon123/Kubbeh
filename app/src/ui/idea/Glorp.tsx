@@ -1,47 +1,76 @@
-// Prof. Glorp's live portrait: expression follows what he is actually doing.
-import { useEffect, useRef, useState } from 'preact/hooks';
+// Prof. Glorp, live: the real voxel alien (with his goggles and lab coat) in a little
+// holo-viewport. His face follows what he is actually doing in the crew signal:
+// thinking → focused, talking → happy with nods, done → love, question → wink.
+import { useRef, useState } from 'preact/hooks';
+import type * as THREE from 'three';
 import { crew, looks } from '../../core/state';
 import { sfx } from '../../core/bus';
 import { pick } from '../../core/util';
 import type { Expression } from '../../core/types';
-import { portraitPainter } from '../../economy/pixelart';
 import { babble } from '../../audio/sfx';
+import { buildAlien, type AlienParts, type Face } from '../../vox/alien';
+import { dressAlien } from '../../vox/cosmetics';
+import { VoxView } from '../shop/vox/VoxView';
+import { framed } from '../shop/vox/models';
 
 const POKES = ['Hey! That tickles.', 'I am 94% jelly, please be gentle.', 'Ideas incoming…', 'Blorp.', 'Careful, I bruise purple.'];
 
-export function GlorpPortrait({ onPoke }: { onPoke?: (line: string) => void }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const [blink, setBlink] = useState(false);
-  const [talk, setTalk] = useState(false);
-  const [hop, setHop] = useState(0);
-  const [flash, setFlash] = useState<Expression | null>(null);
+export function GlorpPortrait({ onPoke, size = 96 }: { onPoke?: (line: string) => void; size?: number }) {
+  const parts = useRef<AlienParts | null>(null);
+  const flash = useRef<{ e: Face; until: number } | null>(null);
+  const hop = useRef(0);
+  const [, force] = useState(0);
   const look = looks.value.find((l) => l.id === 'glorp') ?? looks.value[0];
   const me = crew.value.find((m) => m.id === 'glorp');
   const act = me?.activity ?? 'idle';
-  const expr: Expression = flash ?? (act === 'thinking' || act === 'planning' ? 'focused' : act === 'celebrating' ? 'love' : act === 'question' ? 'wink' : act === 'bugfix' ? 'cry' : look.expression);
+  const actRef = useRef(act);
+  actRef.current = act;
+  const base: Expression = act === 'thinking' || act === 'planning' ? 'focused' : act === 'celebrating' ? 'love' : act === 'question' ? 'wink' : act === 'bugfix' ? 'cry' : act === 'writing' ? 'happy' : look.expression;
+  const baseRef = useRef<Face>(base);
+  baseRef.current = base;
+  const lookKey = [look.skin, look.body, look.belly, look.bulbA, look.bulbB, look.hat, look.outfit, look.accessory].join('|');
 
-  useEffect(() => {
-    let t: ReturnType<typeof setTimeout>;
-    const loop = () => { t = setTimeout(() => { setBlink(true); setTimeout(() => setBlink(false), 130); loop(); }, 1800 + Math.random() * 2400); };
-    loop();
-    return () => clearTimeout(t);
-  }, []);
-  useEffect(() => {
-    if (act !== 'writing') { setTalk(false); return; }
-    const i = setInterval(() => setTalk((v) => !v), 150);
-    return () => clearInterval(i);
-  }, [act]);
-  useEffect(() => { if (ref.current) portraitPainter(look, { blink, talk, expression: expr }).blit(ref.current); }, [look, blink, talk, expr]);
+  const make = () => {
+    const a = buildAlien(look, 0.016);
+    try { dressAlien(a, look); } catch { /* cosmetics still loading */ }
+    parts.current = a;
+    return framed(a.root, 1.02);
+  };
+
+  let blinkUntil = 0, nextBlink = 0;
+  const animate = (_o: THREE.Object3D, t: number) => {
+    const a = parts.current; if (!a) return;
+    const now = performance.now();
+    if (now > nextBlink) { blinkUntil = now + 130; nextBlink = now + 1800 + Math.random() * 2600; }
+    const f = flash.current && flash.current.until > now ? flash.current.e : now < blinkUntil ? 'blink' : baseRef.current;
+    a.setFace(f);
+    const talking = actRef.current === 'writing';
+    const busy = actRef.current !== 'idle';
+    const k = (now - hop.current) / 1000;
+    const jump = k >= 0 && k < 0.5 ? Math.sin((k / 0.5) * Math.PI) * 0.18 : 0;
+    a.root.position.y = jump;
+    const sq = 1 + Math.sin(t * (talking ? 9 : busy ? 4 : 2.2)) * (talking ? 0.035 : 0.02) - (k >= 0 && k < 0.15 ? 0.08 : 0);
+    a.jelly.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
+    a.head.rotation.x = talking ? Math.sin(t * 9) * 0.06 : Math.sin(t * 1.3) * 0.03;
+    a.head.rotation.z = Math.sin(t * 0.9) * (actRef.current === 'thinking' ? 0.12 : 0.04);
+    a.root.rotation.y = -0.35 + Math.sin(t * 0.6) * 0.18;
+    if (a.antL) a.antL.rotation.x = Math.sin(t * 3.1) * 0.08;
+    if (a.antR) a.antR.rotation.x = Math.sin(t * 2.7 + 1) * 0.08;
+    a.armR.rotation.z = talking ? -0.3 - Math.abs(Math.sin(t * 4.5)) * 0.5 : -0.1;
+  };
 
   return (
-    <canvas key={hop} ref={ref} width={40} height={40} class={`pixelated ${hop ? 'hop' : ''}`} title="Prof. Glorp — poke him"
+    <button type="button" class="glorp-port" title="Prof. Glorp — poke him" aria-label="Poke Prof. Glorp"
       onClick={() => {
         const line = pick(POKES);
         sfx('boing', .55, 1.1); babble(line, 1.25);
-        setHop((h) => h + 1); setFlash(pick<Expression>(['shocked', 'derp', 'tongue']));
-        setTimeout(() => setFlash(null), 900);
+        hop.current = performance.now();
+        flash.current = { e: pick<Face>(['shocked', 'derp', 'tongue']), until: performance.now() + 900 };
+        force((n) => n + 1);
         onPoke?.(line);
-      }} />
+      }}>
+      <VoxView size={size} spin="always" eager cacheKey={`glorp:${lookKey}`} make={make} animate={animate} yaw={0} pitch={0.08} fill={0.98} />
+    </button>
   );
 }
 

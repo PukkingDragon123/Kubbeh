@@ -1,12 +1,11 @@
-// Lab stations: the clickable machines the crew works at. Each exposes work "spots"
-// (where an alien stands + which animation it plays), blocked floor cells, and a focus anchor.
+// Ship stations: the clickable machines the crew works at, all high-resolution voxel.
+// Each exposes work "spots" (where an alien stands + which animation it plays), a blocked
+// floor rect, a camera focus anchor, and a per-frame update that makes it feel alive.
 import * as THREE from 'three';
 import type { PanelId } from '../core/types';
-import { Vox, voxMesh, MAT } from './voxel';
-import { pixTex, pixText, canvas, pixEllipse } from './pixels';
-import { neonText } from './env';
-import { crew, economy, fuel } from '../core/state';
-import { bus } from '../core/bus';
+import { M, S, hash3, mix, shade } from '../vox/core';
+import { PAL, U, grid, mesh, plate, hazard, stampText, textWidth, glowMat, vgrad } from '../vox/props/kit';
+import { crew, economy, fuel, activeProjectId, projects } from '../core/state';
 import type { Particles } from './particles';
 
 export type Anim = 'type' | 'think' | 'research' | 'carry' | 'hammer' | 'whack' | 'scribble' | 'vat' | 'wave' | 'idle' | 'sit' | 'play' | 'sleep' | 'present' | 'jump';
@@ -27,7 +26,6 @@ export interface Station {
   update?(dt: number, t: number): void;
 }
 
-const S = 0.125;
 const faceToward = (from: THREE.Vector3, to: THREE.Vector3) => Math.atan2(to.x - from.x, to.z - from.z);
 
 function hitBox(w: number, h: number, d: number, y = h / 2) {
@@ -35,485 +33,529 @@ function hitBox(w: number, h: number, d: number, y = h / 2) {
   m.position.y = y;
   return m;
 }
+const busyCount = () => crew.value.filter((m) => m.activity !== 'idle' && m.activity !== 'sleeping').length;
+const anyDoing = (...k: string[]) => crew.value.some((m) => k.includes(m.activity));
+const setGlow = (o: THREE.Object3D, mat: THREE.Material) => { o.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) m.material = mat; }); return o; };
 
-function screenMesh(w: number, h: number, tex: THREE.Texture, glow = 1.35) {
-  const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, color: new THREE.Color(glow, glow, glow) });
-  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+/** Instanced glowing cubes we can drive as a bar graph / waveform. */
+class VoxBars {
+  mesh: THREE.InstancedMesh;
+  private m = new THREE.Matrix4();
+  constructor(public cols: number, public rows: number, public cell: number, color: number, k = 1.8) {
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), toneMapped: false });
+    this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(cell * 0.82, cell * 0.82, cell * 0.5), mat, cols * rows);
+    this.mesh.frustumCulled = false;
+  }
+  set(values: number[]) {
+    let n = 0;
+    for (let c = 0; c < this.cols; c++) {
+      const h = Math.round(Math.max(0, Math.min(1, values[c] ?? 0)) * this.rows);
+      for (let r = 0; r < h; r++) { this.m.setPosition((c - (this.cols - 1) / 2) * this.cell, r * this.cell, 0); this.mesh.setMatrixAt(n++, this.m); }
+    }
+    this.mesh.count = n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
 }
 
-function label(text: string, color = '#9dff8a', scale = 2) {
-  const w = (text.length * 6 + 4) * scale, h = 11 * scale;
-  const tex = pixTex(w, h, (ctx) => { ctx.fillStyle = '#0b100dcc'; ctx.fillRect(0, 0, w, h); pixText(ctx, text, 2 * scale, 2 * scale, scale, color); });
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w / 90, h / 90), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, transparent: true }));
-  return m;
-}
-
-// ── MAIN COMPUTER BANK ───────────────────────────────────────────────────────
-function computerBank(fx: Particles): Station {
+// ── MAIN BRIDGE CONSOLE ──────────────────────────────────────────────────────
+function computer(): Station {
   const g = new THREE.Group();
-  const v = new Vox();
-  const TOP = 0x3a4640, LEG = 0x232b27, DRW = 0x2e3833;
-  // desk 40 x 12 voxels, height 5 (0.625)
-  v.box(0, 4, 0, 40, 5, 12, TOP);
-  v.box(0, 0, 0, 2, 4, 12, LEG).box(38, 0, 0, 40, 4, 12, LEG);
-  v.box(2, 0, 0, 10, 4, 11, DRW).box(4, 2, 11, 8, 3, 12, 0x9aa69e);
-  // server tower under desk with blinky lights
-  v.box(28, 0, 1, 34, 4, 10, 0x1b211e);
-  for (let i = 0; i < 4; i++) v.set(29 + i, 3, 10, [0x8cf56b, 0xff6fd6, 0x52f2ff, 0xffbe3d][i], 2.5);
+  g.position.set(1.2, 0, -7.0);
+  // desk: curved console 5 wide, 1.6 deep (model units ×16)
+  const d = grid([-42, 0, -14], [42, 66, 14], 1.5);
+  const deskTop = (x: number) => 15 + Math.cos((x / 40) * Math.PI * 0.5) * 0.5;
+  d.add(S.box([-40, 0, -12], [40, 14, 10], 1.2), (x, y, z) => {
+    if (y < 1.5) return PAL.hullDeep;
+    if (z > 8 && y > 4 && y < 6) return x % 10 < 0.8 ? PAL.hullDark : PAL.paintTeal;          // front teal band
+    return plate(PAL.hullDark, x + 40, y, { pw: 20, ph: 14 });
+  }, M.metal);
+  d.add(S.box([-41, 14, -13], [41, 16, 12], 0.8), (x, _y, z) => (z > 10 ? PAL.hullHi : plate(PAL.steelDark, x + 41, z + 13, { pw: 82, ph: 25, bolt: false })), M.metal);
   // keyboards
-  for (const kx of [6, 17, 28]) { v.box(kx, 5, 7, kx + 7, 6, 10, 0x2b302d); for (let i = 0; i < 6; i++) v.set(kx + 1 + i, 6, 8, i % 2 ? 0x9dff8a : 0x52f2ff, 1.2); }
-  // CRT casings (beige-green retro)
-  const crt = (x0: number, w: number, h: number, d: number) => {
-    v.rbox(x0, 5, 1, x0 + w, 5 + h, 1 + d, 1, 0xb9b79a);
-    v.box(x0 + 1, 5 + 1, 1 + d, x0 + w - 1, 5 + h - 1, 2 + d, 0x1a1f1c);
-    v.box(x0 + w - 3, 6, 1 + d, x0 + w - 2, 7, 2 + d, 0xff5a5a, 2);
+  for (const kx of [-24, 0, 24]) {
+    d.add(S.box([kx - 9, 16, 2], [kx + 9, 17, 9], 0.3), PAL.hullDeep, M.metal);
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 3; j++) d.add(S.box([kx - 8 + i * 2.05, 17, 3 + j * 2], [kx - 6.6 + i * 2.05, 17.6, 4.4 + j * 2]), (i + j) % 5 === 0 ? 0xffffff : 0x2f3a40, (i + j) % 5 === 0 ? M.glow : M.solid);
+  }
+  // big monitors on articulated arms: frames only, holo content is live voxels
+  const monitor = (cx: number, w: number, h: number, y0: number, tilt: number) => {
+    d.add(S.box([cx - 1.4, 16, -10], [cx + 1.4, y0, -8]), PAL.steelDark, M.metal);
+    d.add(S.box([cx - w / 2 - 1.6, y0, -11 + tilt], [cx + w / 2 + 1.6, y0 + h + 3, -7.6 + tilt], 0.8), (x, y) => (y > y0 + h + 1.8 ? PAL.hullHi : PAL.hullDeep), M.metal);
+    d.carve(S.box([cx - w / 2, y0 + 1.5, -8.4 + tilt], [cx + w / 2, y0 + h + 1.5, -7 + tilt]));
+    d.add(S.box([cx - w / 2, y0 + 1.5, -9 + tilt], [cx + w / 2, y0 + h + 1.5, -8.4 + tilt]), 0x04120c, M.gloss);
+    d.add(S.sphere([cx + w / 2 - 0.4, y0 + 0.7, -7.4 + tilt], 0.5), 0xffffff, M.glow);
   };
-  crt(1, 11, 9, 6); crt(13, 14, 12, 7); crt(29, 11, 9, 6);
-  // antenna on top of the main CRT
-  v.box(19, 17, 4, 20, 22, 5, 0x9aa69e).set(19, 22, 4, 0xff6fd6, 3);
-  const body = voxMesh(v, { size: S, center: 'none', origin: [20, 0, 6], material: MAT.solid });
+  monitor(-25, 18, 13, 22, 1.5); monitor(0, 26, 18, 24, 0); monitor(25, 18, 13, 22, 1.5);
+  // under-desk server with blinky lights
+  d.add(S.box([28, 1.5, -8], [38, 13, 8], 0.6), PAL.hullDeep, M.metal);
+  for (let i = 0; i < 5; i++) d.add(S.box([29 + i * 1.8, 10, 8], [30 + i * 1.8, 11, 8.6]), [PAL.glob, PAL.pink, PAL.cyan, PAL.amber, PAL.glob][i], M.glow);
+  // hologram emitter puck
+  d.add(S.cyl(0, 6, 4, 16, 18), PAL.steel, M.metal);
+  d.add(S.cyl(0, 6, 2.6, 18, 18.6), 0xffffff, M.glow);
+  const body = setGlow(mesh(d), glowMat(0xc8ffe8, 1.6));
   g.add(body);
 
-  // screens: canvas textures redrawn live
-  const scr = [canvas(128, 96), canvas(160, 128), canvas(128, 96)];
-  const tex = scr.map(({ c }) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; return t; });
-  const sL = screenMesh(9 * S, 7 * S, tex[0]); sL.position.set((1 + 5.5 - 20) * S, (5 + 4.5) * S, (2 + 6 - 6) * S + 0.005);
-  const sC = screenMesh(12 * S, 10 * S, tex[1]); sC.position.set((13 + 7 - 20) * S, (5 + 6) * S, (2 + 7 - 6) * S + 0.005);
-  const sR = screenMesh(9 * S, 7 * S, tex[2]); sR.position.set((29 + 5.5 - 20) * S, (5 + 4.5) * S, (2 + 6 - 6) * S + 0.005);
-  g.add(sL, sC, sR);
-  const glowLight = new THREE.PointLight(0x52f2ff, 4, 5, 1.6); glowLight.position.set(0, 1.3, 1.2); g.add(glowLight);
+  // live holo content on the 3 screens (instanced voxel bars & waves)
+  const L = new VoxBars(10, 7, 1.6 * U, PAL.glob), C = new VoxBars(14, 9, 1.6 * U, PAL.cyan), R = new VoxBars(10, 7, 1.6 * U, PAL.pink);
+  L.mesh.position.set(-25 * U, 24 * U, (-7.6 + 1.5) * U);
+  C.mesh.position.set(0, 26.2 * U, -7.6 * U);
+  R.mesh.position.set(25 * U, 24 * U, (-7.6 + 1.5) * U);
+  g.add(L.mesh, C.mesh, R.mesh);
 
-  const hit = hitBox(5.2, 2.2, 1.6); g.add(hit);
-  g.position.set(1.2, 0, -7.0);
-  const lbl = label('TERMINAL'); lbl.position.set(0, 2.45, 0.2); g.add(lbl);
+  // rotating voxel hologram of the active project above the emitter
+  const holo = new THREE.Group(); holo.position.set(0, 30 * U, 6 * U);
+  const hg = grid([-8, -8, -8], [8, 8, 8], 1.5);
+  hg.add(S.sphere([0, 0, 0], 6), (x, y, z) => ((Math.floor(x * 0.6) + Math.floor(y * 0.6) + Math.floor(z * 0.6)) % 2 ? 0xffffff : 0x8ad8ff), M.glow);
+  hg.carve(S.sphere([0, 0, 0], 5));
+  hg.add(S.torus([0, 0, 0], [0.3, 1, 0], 7.4, 0.5), 0xffffff, M.glow);
+  const holoMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(0.2, 0.8, 0.75), transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const hm = mesh(hg, { castShadow: false }); hm.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = holoMat; });
+  holo.add(hm);
+  g.add(holo);
+  // projection cone (stacked translucent voxel rings)
+  for (let i = 0; i < 5; i++) {
+    const rg = grid([-6, -1, -6], [6, 1, 6], 2);
+    rg.add(S.torus([0, 0, 0], [0, 1, 0], 1 + i * 1.1, 0.25), 0xffffff, M.glow);
+    const rm = mesh(rg, { castShadow: false }); rm.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = holoMat; });
+    rm.position.set(0, (19 + i * 2.2) * U, 6 * U); g.add(rm);
+  }
 
-  // live log
-  const log: string[] = ['GLOB TERMINAL V5', 'READY.'];
-  let burst = 0;
-  const push = (s: string) => { log.push(s.toUpperCase().slice(0, 24)); if (log.length > 40) log.shift(); };
-  let lastLabels = '';
-  bus.on('turn:writing', () => { burst = 1.2; });
-  bus.on('tool:start', ({ label: l }) => push('> ' + l));
-  bus.on('turn:start', ({ prompt }) => push('$ ' + prompt));
-  bus.on('turn:end', ({ ok }) => push(ok ? 'DONE ✓' : 'ERR !'));
-  const CODE = ['FN GLORP() {', '  LET X = 42;', '  IF JELLY {', '    WOBBLE();', '  }', 'RETURN OK;', 'FOR I IN 0..N', '  SPAWN(CLONE)', 'CONST G = 9.8', '// TODO: SNACK', 'PLAYER.JUMP()', 'ENEMY.CHOMP()'];
-  let acc = 0, sweep = 0;
-
-  const spots: Spot[] = [-1.5, 0, 1.5].map((dx, i) => {
-    const pos = new THREE.Vector3(1.2 + dx, 0, -5.75);
-    return { id: `pc${i}`, station: 'computer', pos, face: Math.PI, anim: 'type' as Anim };
-  });
-
+  const hit = hitBox(5.2, 3.2, 1.8); g.add(hit);
+  const spots: Spot[] = [-1.5, 0, 1.5].map((dx, i) => ({ id: `pc${i}`, station: 'computer', pos: new THREE.Vector3(1.2 + dx, 0, -5.55), face: Math.PI, anim: 'type' as Anim }));
+  let acc = 0;
+  const vals = { l: new Array(10).fill(0.2), c: new Array(14).fill(0.2), r: new Array(10).fill(0.2) };
   return {
-    id: 'computer', label: 'Main Terminal', panel: 'terminal', group: g, pick: [hit, body], rect: [-1.4, -7.9, 3.8, -6.1],
-    anchor: new THREE.Vector3(1.2, 1.2, -6.4), spots,
+    id: 'computer', label: 'Bridge Console', panel: 'terminal', group: g, pick: [hit, body], rect: [-1.4, -7.9, 3.8, -6.1],
+    anchor: new THREE.Vector3(1.2, 1.5, -6.6), spots,
     update(dt, t) {
-      acc += dt; sweep += dt;
-      if (burst > 0) { burst -= dt; if (Math.random() < dt * 14) push(CODE[Math.floor(Math.random() * CODE.length)]); }
-      const busy = crew.value.filter((m) => m.activity !== 'idle' && m.activity !== 'sleeping');
-      const labels = busy.map((m) => m.name + ':' + m.label).join('|');
-      if (labels !== lastLabels) { lastLabels = labels; for (const m of busy) if (!log.some((l) => l.includes(m.label.toUpperCase().slice(0, 12)))) push(`${m.name}: ${m.label}`); }
-      if (acc < (busy.length || burst > 0 ? 0.12 : 0.4)) return;
-      acc = 0;
-      // centre: log
-      { const { ctx, c } = scr[1]; ctx.fillStyle = '#04120a'; ctx.fillRect(0, 0, c.width, c.height);
-        ctx.fillStyle = '#0d2a17'; for (let y = 0; y < c.height; y += 2) ctx.fillRect(0, y, c.width, 1);
-        pixText(ctx, 'GLOB TERMINAL', 4, 3, 1, '#ff6fd6');
-        const lines = log.slice(-14);
-        lines.forEach((l, i) => pixText(ctx, l, 4, 14 + i * 8, 1, i === lines.length - 1 ? '#d8ffc8' : '#79e86a'));
-        if (Math.floor(t * 2) % 2) { ctx.fillStyle = '#d8ffc8'; ctx.fillRect(4, 14 + lines.length * 8, 5, 7); }
-        tex[1].needsUpdate = true; }
-      // left: fuel + genes
-      { const { ctx, c } = scr[0]; const f = fuel.value; ctx.fillStyle = '#04100c'; ctx.fillRect(0, 0, c.width, c.height);
-        const col = f.tier === 'full' ? '#8cf56b' : f.tier === 'half' ? '#52f2ff' : f.tier === 'quarter' ? '#ffbe3d' : '#ff5a5a';
-        pixText(ctx, 'FUEL', 6, 6, 2, col);
-        pixText(ctx, `${Math.round(f.level * 100)}%`, 64, 6, 2, col);
-        ctx.fillStyle = '#0f2a1a'; ctx.fillRect(6, 26, 116, 12); ctx.fillStyle = col; ctx.fillRect(7, 27, Math.round(114 * f.level), 10);
-        for (const m of [0.5, 0.25, 0.1]) { ctx.fillStyle = '#ffffff88'; ctx.fillRect(7 + Math.round(114 * m), 24, 1, 16); }
-        pixText(ctx, 'GENES ' + economy.value.balance, 6, 48, 1, '#8cf56b');
-        pixText(ctx, 'CREW  ' + crew.value.length, 6, 60, 1, '#52f2ff');
-        pixText(ctx, busy.length ? 'BUSY  ' + busy.length : 'IDLE', 6, 72, 1, busy.length ? '#ff6fd6' : '#79e86a');
-        tex[0].needsUpdate = true; }
-      // right: radar
-      { const { ctx, c } = scr[2]; ctx.fillStyle = '#030d10'; ctx.fillRect(0, 0, c.width, c.height);
-        const cx = 64, cy = 50; ctx.strokeStyle = '#1d6b74';
-        for (const r of [14, 28, 42]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); }
-        const a = sweep * 2.2; ctx.strokeStyle = '#52f2ff'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 42, cy + Math.sin(a) * 42); ctx.stroke();
-        crew.value.forEach((m, i) => { const ang = i * 1.9 + 0.4, rr = 12 + (i * 9) % 30; ctx.fillStyle = m.activity === 'idle' ? '#2f8f4a' : '#ff6fd6'; ctx.fillRect(Math.round(cx + Math.cos(ang) * rr) - 1, Math.round(cy + Math.sin(ang) * rr) - 1, 3, 3); });
-        pixText(ctx, busy.length ? 'WORKING' : 'SCANNING', 4, 86, 1, busy.length ? '#ff6fd6' : '#52f2ff');
-        tex[2].needsUpdate = true; }
-      glowLight.intensity = 3 + (busy.length ? 2 + Math.sin(t * 20) * 0.6 : 0);
-      if (burst > 0 && Math.random() < 0.3) fx.emit({ tile: ['code1', 'code2', 'code3', 'code4'], pos: [1.2 + (Math.random() - 0.5) * 3, 1.6, -6.3], vel: [0, 0.6, 0.4], spread: [0.3, 0.2, 0.2], life: 1.2, size: 0.18, color: ['#9dff8a', '#52f2ff'], additive: true });
+      acc += dt;
+      holo.rotation.y += dt * (busyCount() ? 1.6 : 0.45);
+      holo.position.y = 30 * U + Math.sin(t * 1.4) * 0.03;
+      if (acc < 0.09) return; acc = 0;
+      const busy = busyCount() > 0, writing = anyDoing('writing', 'coding');
+      for (let i = 0; i < 10; i++) vals.l[i] = busy ? 0.25 + Math.abs(Math.sin(t * 3 + i * 0.7)) * 0.75 : 0.15 + Math.sin(t * 0.5 + i) * 0.08;
+      for (let i = 0; i < 14; i++) vals.c[i] = writing ? 0.3 + Math.abs(Math.sin(t * 7 + i * 1.3) * Math.cos(t * 2.1 + i)) * 0.7 : 0.4 + Math.sin(t * 1.2 + i * 0.45) * 0.3;
+      const tasks = projects.value.find((p) => p.id === activeProjectId.value)?.tasks ?? projects.value[0]?.tasks ?? [];
+      const done = tasks.filter((x) => x.status === 'done').length / Math.max(1, tasks.length);
+      for (let i = 0; i < 10; i++) vals.r[i] = i < Math.round(done * 10) ? 1 : 0.12 + (i % 3) * 0.05;
+      L.set(vals.l); C.set(vals.c); R.set(vals.r);
     },
   };
 }
 
-// ── PROF. GLORP'S IDEA DESK + CHALKBOARD ─────────────────────────────────────
+// ── PROF. GLORP'S IDEA DESK ──────────────────────────────────────────────────
 function ideaDesk(): Station {
   const g = new THREE.Group();
-  const v = new Vox();
-  v.box(0, 4, 0, 20, 5, 9, 0x6b4a2e).box(0, 0, 0, 2, 4, 9, 0x4d3520).box(18, 0, 0, 20, 4, 9, 0x4d3520).box(2, 1, 1, 18, 4, 2, 0x5a3e26);
-  // paper stacks + desk lamp + coffee mug + lightbulb trophy
-  v.box(2, 5, 2, 6, 7, 6, 0xeeeedd).box(2, 7, 2, 6, 8, 6, 0xdcdcc8);
-  v.box(15, 5, 2, 17, 6, 4, 0x2f6b4a).box(15, 6, 2, 16, 11, 3, 0x2f6b4a).box(13, 10, 1, 17, 11, 4, 0x3d8f63).box(14, 9, 2, 16, 10, 3, 0xfff1a8, 3);
-  v.cyl(9.5, 6, 1.5, 5, 8, 0xff6fd6).set(11, 6, 6, 0xff6fd6);
-  v.ellipsoid(12, 6.5, 6.5, 1.3, 1.3, 1.3, 0xffe27a, 2.2);
-  const desk = voxMesh(v, { size: S, center: 'xz' });
-  g.add(desk);
-  // chalkboard on legs behind the professor
-  const cb = new Vox();
-  cb.box(0, 0, 0, 1, 22, 1, 0x4d3520).box(33, 0, 0, 34, 22, 1, 0x4d3520).box(0, 8, -1, 34, 22, 0, 0x6b4a2e).box(1, 9, -1, 33, 21, 0, 0x1d3a2a);
-  const board = voxMesh(cb, { size: S, center: 'xz' });
-  board.position.set(0, 0, -1.1);
-  const chalk = pixTex(128, 52, (ctx) => {
-    ctx.fillStyle = '#1d3a2a'; ctx.fillRect(0, 0, 128, 52);
-    pixText(ctx, 'IDEAS!!', 4, 3, 1, '#fff6c8');
-    pixText(ctx, 'JUMP+GRAVITY', 4, 14, 1, '#d6f5ff');
-    pixText(ctx, '= ???', 20, 23, 1, '#ffd0f0');
-    // platformer doodle
-    ctx.fillStyle = '#e8f0d8'; ctx.fillRect(74, 40, 50, 2); ctx.fillRect(84, 30, 14, 2); ctx.fillRect(104, 22, 14, 2);
-    pixEllipse(ctx, 88, 25, 3, 3, '#9dff8a'); ctx.fillStyle = '#000'; ctx.fillRect(87, 24, 1, 2); ctx.fillRect(89, 24, 1, 2);
-    ctx.strokeStyle = '#ffffffaa'; ctx.beginPath(); ctx.moveTo(78, 38); ctx.quadraticCurveTo(84, 18, 92, 28); ctx.stroke();
-    pixText(ctx, 'LOOP:', 4, 35, 1, '#9dff8a'); pixText(ctx, 'EXPLORE>LOOT', 4, 43, 1, '#9dff8a');
-    pixText(ctx, '★', 112, 6, 1, '#ffe27a');
-  });
-  const chalkM = new THREE.Mesh(new THREE.PlaneGeometry(32 * S, 12 * S), new THREE.MeshStandardMaterial({ map: chalk, roughness: 0.95, emissive: new THREE.Color('#ffffff'), emissiveMap: chalk, emissiveIntensity: 0.18 }));
-  chalkM.position.set(0, 15 * S, -1.1 + 0.01 - 0.06 + 0.06);
-  g.add(board, chalkM);
-  const hit = hitBox(2.6, 1.4, 1.2); g.add(hit);
-  const lbl = label('IDEA LAB', '#ffe27a'); lbl.position.set(0, 3.2, -1.05); g.add(lbl);
-  g.position.set(-6.2, 0, 2.0);
+  g.position.set(-6.2, 0, 1.5);
+  const d = grid([-24, 0, -12], [24, 60, 10], 1.5);
+  // curved wooden-and-brass desk facing the room
+  d.add(S.box([-20, 0, -6], [20, 13, 6], 1.2), (x, y, z) => {
+    if (y > 11.6) return PAL.woodDark;
+    if (z > 4.6) return x % 8 < 0.7 ? PAL.woodDark : PAL.wood;
+    return PAL.wood;
+  }, M.solid);
+  d.add(S.box([-21, 13, -7], [21, 15, 7], 0.8), 0x3a2414, M.solid);
+  d.add(S.box([-19, 15, -6], [-11, 16, 0]), 0xefe2b8, M.solid);                                 // paper stack
+  for (let i = 0; i < 4; i++) d.add(S.box([-18.5 + i * 0.3, 16 + i * 0.6, -5.5], [-11.5 + i * 0.3, 16.5 + i * 0.6, -0.5]), mix(0xefe2b8, 0xffffff, i * 0.2), M.solid);
+  d.add(S.cyl(14, -2, 2.2, 15, 21), PAL.pink, M.metal); d.add(S.capsule([16.2, 19, -2], [17.6, 17, -2], 0.6), PAL.pink, M.metal); // mug
+  d.add(S.cyl(14, -2, 1.7, 20, 20.6), 0x5a3a1a, M.solid);
+  // brass hologram projector + idea bulb machine
+  d.add(S.cyl(0, -1, 5, 15, 18), 0xb8862a, M.metal);
+  d.add(S.cyl(0, -1, 3.4, 18, 19), 0xffffff, M.glow);
+  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; d.add(S.sphere([Math.cos(a) * 4.4, 17, -1 + Math.sin(a) * 4.4], 0.6), PAL.chrome, M.metal); }
+  // chalk-holo board behind
+  d.add(S.box([-23, 20, -11], [23, 58, -9], 1), (x, y) => (Math.min(x + 23, 23 - x, y - 20, 58 - y) < 2 ? PAL.woodDark : 0x1e3a2a), M.solid);
+  // chalk doodles in voxels: a jelly alien, an arrow, "IDEA!", a jump arc
+  const chalk = 0xe8f4e0;
+  for (let a = 0; a < Math.PI * 2; a += 0.06) d.add(S.sphere([12 + Math.cos(a) * 5.4, 41 + Math.sin(a) * 5, -8.8], 0.45), chalk, M.solid);
+  for (const sx of [-1, 1]) d.add(S.ellipsoid([12 + sx * 2.2, 41, -8.8], [1.3, 2, 0.4]), chalk, M.solid);
+  for (const sx of [-1, 1]) d.add(S.capsule([12 + sx * 2.5, 45.6, -8.8], [12 + sx * 4.2, 50, -8.8], 0.4), chalk, M.solid);
+  stampText(d, 'IDEA!', -21, 55, -8.8, 1, PAL.amber, M.solid, 0.5);
+  for (let i = 0; i <= 30; i++) { const x = -20 + i * 0.75, y = 27 + Math.sin((i / 30) * Math.PI) * 10; d.add(S.sphere([x, y, -8.8], 0.45), chalk, M.solid); }
+  d.add(S.box([-21, 25, -9], [-18, 28, -8.4]), PAL.pink, M.solid);
+  d.add(S.box([-1, 25, -9], [2, 28, -8.4]), PAL.cyan, M.solid);
+  const body = setGlow(mesh(d), glowMat(0xff9ae2, 1.6));
+  g.add(body);
+  // floating hologram brain (voxel, additive)
+  const brain = new THREE.Group(); brain.position.set(0, 27 * U, -1 * U);
+  const bg = grid([-7, -6, -6], [7, 6, 6], 2);
+  bg.add(S.ellipsoid([-2.4, 0, 0], [4, 4.4, 5.2]), (x, y, z) => (Math.sin(x * 2 + Math.sin(z * 1.7) * 2) > 0.5 ? 0xffffff : 0xff9ae2), M.glow);
+  bg.add(S.ellipsoid([2.4, 0, 0], [4, 4.4, 5.2]), (x, y, z) => (Math.sin(z * 2.2 + y * 1.6) > 0.5 ? 0xffffff : 0xff9ae2), M.glow);
+  bg.carve(S.box([-0.25, -6, -6], [0.25, 6, 6]));
+  const brainMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.3, 0.9, 1.4), transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const bm = mesh(bg, { castShadow: false }); bm.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = brainMat; });
+  brain.add(bm);
+  g.add(brain);
+  const hit = hitBox(2.8, 3.6, 1.6); hit.position.z = -0.2; g.add(hit);
   const spots: Spot[] = [{ id: 'glorp', station: 'idea', pos: new THREE.Vector3(-6.2, 0, 3.15), face: 0, anim: 'present' }];
-  return { id: 'idea', label: "Prof. Glorp's Idea Lab", panel: 'idea', group: g, pick: [hit, desk, board], rect: [-7.6, 0.7, -4.8, 2.6], anchor: new THREE.Vector3(-6.2, 1.1, 2.8), spots };
+  return {
+    id: 'idea', label: "Prof. Glorp's Idea Desk", panel: 'idea', group: g, pick: [hit, body], rect: [-7.6, 0.7, -4.8, 2.6], anchor: new THREE.Vector3(-6.2, 1.3, 2.6), spots,
+    update(dt, t) {
+      const glorp = crew.value.find((m) => m.id === 'glorp');
+      const active = glorp && glorp.activity !== 'idle';
+      brain.rotation.y += dt * (active ? 1.8 : 0.5);
+      brain.position.y = 27 * U + Math.sin(t * 1.6) * 0.04;
+      const k = active ? 1 + Math.sin(t * 8) * 0.25 : 0.75 + Math.sin(t * 1.5) * 0.1;
+      brainMat.opacity = 0.55 * k + 0.2;
+    },
+  };
 }
 
-// ── FUEL TANK ────────────────────────────────────────────────────────────────
-const LIQUID_FRAG = /* glsl */ `
-  uniform float uTime; uniform vec3 uDeep; uniform vec3 uBright; uniform float uAlarm;
-  varying vec2 vUv; varying vec3 vPos;
-  void main() {
-    float band = smoothstep(0.0, 1.0, vUv.y);
-    vec3 c = mix(uDeep, uBright, band * 0.8 + 0.1);
-    float stripe = step(0.85, fract(vUv.y * 6.0 - uTime * 0.25)) * 0.25;
-    float swirl = sin(vUv.x * 18.0 + uTime * 1.5 + vUv.y * 9.0) * 0.06;
-    c += stripe + swirl;
-    c = mix(c, vec3(1.0, 0.25, 0.2), uAlarm * (0.5 + 0.5 * sin(uTime * 8.0)) * 0.35);
-    gl_FragColor = vec4(c * 0.95, 0.8);
-  }`;
-const LIQUID_VERT = /* glsl */ `varying vec2 vUv; varying vec3 vPos; void main(){ vUv = uv; vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-
-function fuelTank(fx: Particles): Station {
+// ── THE GIANT FUEL TANK ──────────────────────────────────────────────────────
+function fuelTank(fx: Particles): Station & { lamps: THREE.MeshBasicMaterial[] } {
   const g = new THREE.Group();
-  const H = 3.9, R = 1.12, BASE = 0.7;
-  const v = new Vox();
-  v.cyl(0, 0, 11, 0, 5, (x, y) => (y === 4 ? 0x56645e : (x + y) % 5 === 0 ? 0x2b3631 : 0x39433d));
-  v.cyl(0, 0, 10, 5, 6, 0x56645e);
-  // hazard stripes
-  for (let x = -11; x <= 11; x++) for (let y = 1; y < 3; y++) { const z = 10; if (v.has(x, y, z) || v.has(x, y, z - 1)) v.set(x, y, 11 - (Math.abs(x) > 7 ? 2 : Math.abs(x) > 4 ? 1 : 0), ((x + y) & 2) ? 0xffbe3d : 0x1a1408); }
-  // top cap
-  const cap = new Vox();
-  cap.cyl(0, 0, 10.5, 0, 3, 0x39433d).cyl(0, 0, 7, 3, 4, 0x56645e).box(-1, 4, -1, 2, 7, 2, 0x56645e);
-  const base = voxMesh(v, { size: S, center: 'none', origin: [0, 0, 0], material: MAT.metal });
-  const capM = voxMesh(cap, { size: S, center: 'none', origin: [0, 0, 0], material: MAT.metal });
-  capM.position.y = BASE + H;
-  g.add(base, capM);
-  // glass
-  const glass = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.06, R + 0.06, H, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0xbfffe0, transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 2 }));
-  glass.position.y = BASE + H / 2; glass.renderOrder = 5;
-  // support ribs
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.14, H, 0.14), new THREE.MeshStandardMaterial({ color: 0x39433d, metalness: 0.7, roughness: 0.4 }));
-    rib.position.set(Math.cos(a) * (R + 0.12), BASE + H / 2, Math.sin(a) * (R + 0.12)); g.add(rib);
-  }
-  // liquid
-  const liqMat = new THREE.ShaderMaterial({ vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG, transparent: true, toneMapped: false,
-    uniforms: { uTime: { value: 0 }, uDeep: { value: new THREE.Color('#1f7a2a') }, uBright: { value: new THREE.Color('#a8ff7a') }, uAlarm: { value: 0 } } });
-  const liqGeo = new THREE.CylinderGeometry(R, R, 1, 32, 1);
-  liqGeo.translate(0, 0.5, 0);
-  const liquid = new THREE.Mesh(liqGeo, liqMat);
-  liquid.position.y = BASE;
-  g.add(liquid, glass);
-  const tankLight = new THREE.PointLight(0x8cf56b, 10, 7, 1.6); tankLight.position.set(0, BASE + 1.4, 1.4); g.add(tankLight);
-
-  // markers at 50 / 25 / 10 %
-  const markerDefs = [{ k: 0.5, col: 0xffbe3d, txt: '50%' }, { k: 0.25, col: 0xff8a3d, txt: '25%' }, { k: 0.1, col: 0xff4040, txt: '10%' }];
-  const markers = markerDefs.map((m) => {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(R + 0.13, 0.045, 6, 40), new THREE.MeshStandardMaterial({ color: 0x6b7d72, metalness: 0.8, roughness: 0.3 }));
-    ring.rotation.x = Math.PI / 2; ring.position.y = BASE + H * m.k;
-    const lampMat = new THREE.MeshBasicMaterial({ color: 0x222222, toneMapped: false });
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.12), lampMat);
-    lamp.position.set(0, BASE + H * m.k, R + 0.22);
-    const tag = label(m.txt, '#ffd77a', 2); tag.position.set(0.55, BASE + H * m.k, R + 0.2); tag.scale.setScalar(0.85);
-    g.add(ring, lamp, tag);
-    return { ...m, lampMat };
-  });
-
-  // beacons on top
-  const beacons: THREE.Group[] = [];
-  for (const sx of [-0.55, 0.55]) {
-    const b = new THREE.Group();
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x331a0a, toneMapped: false }));
-    const beam = new THREE.Mesh(new THREE.ConeGeometry(0.9, 2.6, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xffa020, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
-    beam.rotation.z = Math.PI / 2; beam.position.x = 1.3;
-    b.add(dome, beam);
-    b.position.set(sx, BASE + H + 0.42, 0);
-    g.add(b); beacons.push(b);
-  }
-
-  // digital readout on the base
-  const { c, ctx } = canvas(64, 20);
-  const rtex = new THREE.CanvasTexture(c); rtex.colorSpace = THREE.SRGBColorSpace; rtex.magFilter = THREE.NearestFilter; rtex.minFilter = THREE.NearestFilter; rtex.generateMipmaps = false;
-  const readout = screenMesh(0.9, 0.28, rtex, 1.5); readout.position.set(0, 0.42, 1.4 + 0.01);
-  g.add(readout);
-  const fuelSign = neonText('FUEL', [0x8cf56b], 0.07, 3); fuelSign.group.position.set(-0.4, BASE + H + 0.9, 0.2); g.add(fuelSign.group);
-
-  const hit = hitBox(2.6, H + 1.2, 2.6, (H + 1.2) / 2); g.add(hit);
   g.position.set(9.2, 0, -5.6);
-  let shown = fuel.value.level, lastTxt = '';
+  const H = 84; // model units of tank interior (5.25 world)
+  const R = 19;
+  const t = grid([-26, 0, -26], [26, 104, 26], 1);
+  // base plinth with hazard ring
+  t.add(S.cyl(0, 0, 23, 0, 8), (x, y, z) => { const r = Math.hypot(x, z); if (y > 6.6) return PAL.hullHi; if (r > 21.6) return hazard(Math.atan2(z, x) * 10, y, 2); return plate(PAL.hullDark, Math.atan2(z, x) * 12, y, { pw: 8, ph: 8 }); }, M.metal);
+  // top cap
+  t.add(S.cyl(0, 0, 22, 8 + H, 8 + H + 8), (x, y, z) => (y < 8 + H + 1.4 ? PAL.hullHi : plate(PAL.hullDark, Math.atan2(z, x) * 12, y, { pw: 8, ph: 8 })), M.metal);
+  t.add(S.cone(0, 0, 8 + H + 8, 8 + H + 14, 14, 6), PAL.steelDark, M.metal);
+  // vertical struts with bolts
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    const x = Math.cos(a) * (R + 2), z = Math.sin(a) * (R + 2);
+    t.add(S.box([x - 1.4, 8, z - 1.4], [x + 1.4, 8 + H, z + 1.4], 0.4), (_x, y) => (Math.floor(y) % 12 < 1 ? PAL.chrome : PAL.steel), M.metal);
+  }
+  // marker rings at 50/25/10 with lamp housings (lamps are separate, animated)
+  const markers = [0.5, 0.25, 0.1];
+  for (const mk of markers) t.add(S.torus([0, 8 + H * mk, 0], [0, 1, 0], R + 1, 0.8), PAL.hazardY, M.metal);
+  // glass
+  t.add(S.cyl(0, 0, R, 8, 8 + H), PAL.glass, M.glass);
+  t.carve(S.cyl(0, 0, R - 1, 8, 8 + H));
+  // pipes into the wall + valve
+  t.add(S.capsule([0, 100, -4], [0, 104, -26], 3), PAL.paintTeal, M.metal);
+  t.add(S.capsule([-16, 4, -10], [-16, 4, -26], 2.4), PAL.paintTeal, M.metal);
+  t.add(S.disc([-16, 4, -18], [0, 0, 1], 4, 0.8, 8), PAL.paintRed, M.metal);
+  // FUEL sign plate on the cap
+  t.add(S.box([-10, 8 + H + 1, R + 1.6], [10, 8 + H + 7, R + 2.4]), PAL.hullDeep, M.metal);
+  stampText(t, 'FUEL', -textWidth('FUEL', 1) / 2, 8 + H + 6, R + 2.4, 1, 0xffffff, M.glow, 0.8);
+  const shell = setGlow(mesh(t), glowMat(PAL.glob, 2));
+  g.add(shell);
+
+  // liquid: unit-height voxel column scaled by fuel level, plus a wavy surface disc
+  const lg = grid([-18, 0, -18], [18, 16, 18], 1);
+  lg.add(S.cyl(0, 0, R - 1.2, 0, 16), (x, y, z) => (Math.sin(y * 0.8 + Math.atan2(z, x) * 3) > 0.7 ? 0xc8ffb0 : 0x5fe060), M.glow);
+  const liquidMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1, 1.3, 1), transparent: true, opacity: 0.72, toneMapped: false, depthWrite: false });
+  const liquid = mesh(lg, { castShadow: false }); liquid.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) { m.material = liquidMat; m.renderOrder = 1; } });
+  liquid.position.y = 8 * U;
+  g.add(liquid);
+  const sg = grid([-18, -1, -18], [18, 1, 18], 1);
+  sg.add(S.cyl(0, 0, R - 1.2, -0.5, 0.5), (x, _y, z) => ((Math.floor(x / 3) + Math.floor(z / 3)) % 2 ? 0xe8ffd8 : 0x9dff8a), M.glow);
+  const surfMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.6, 1.8, 1.6), toneMapped: false, transparent: true, opacity: 0.9 });
+  const surface = mesh(sg, { castShadow: false }); surface.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = surfMat; });
+  g.add(surface);
+
+  // lamps per marker (two per ring) + rotating beacons on top
+  const lamps: THREE.MeshBasicMaterial[] = [];
+  markers.forEach((mk) => {
+    const mat = glowMat(PAL.glob, 2);
+    lamps.push(mat);
+    for (const a of [-0.5, 0.5]) {
+      const lgm = grid([-2, -2, -2], [2, 2, 2], 3);
+      lgm.add(S.sphere([0, 0, 0], 1.5), 0xffffff, M.glow);
+      const lamp = mesh(lgm, { castShadow: false }); lamp.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = mat; });
+      lamp.position.set(Math.sin(a) * (R + 2) * U, (8 + H * mk) * U, Math.cos(a) * (R + 2) * U);
+      g.add(lamp);
+    }
+  });
+  const beacons = new THREE.Group(); beacons.position.y = (8 + H + 14) * U; g.add(beacons);
+  const beaconMat = glowMat(PAL.amber, 0.3);
+  const bgd = grid([-4, 0, -4], [4, 6, 4], 2);
+  bgd.add(S.cyl(0, 0, 2.6, 0, 1.4), PAL.steelDark, M.metal);
+  bgd.add(S.cyl(0, 0, 2.2, 1.4, 5), 0xffffff, M.glow);
+  const beaconObj = mesh(bgd, { castShadow: false }); beaconObj.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) m.material = beaconMat; });
+  beacons.add(beaconObj);
+  const beam = new THREE.SpotLight(0xffa020, 0, 14, 0.35, 0.6, 1.2);
+  beam.position.set(0, 0.25, 0); beam.target.position.set(4, -2, 0); beacons.add(beam, beam.target);
+
+  const hit = hitBox(2.8, 6.8, 2.8); g.add(hit);
+  let shown = fuel.value.level;
+  let bubbleT = 0;
   return {
-    id: 'tank', label: 'Fuel Tank', panel: 'fuel', group: g, pick: [hit], rect: [7.8, -7.0, 10.6, -4.2],
-    anchor: new THREE.Vector3(9.2, 2.4, -5.6), spots: [],
-    update(dt, t) {
+    id: 'tank', label: 'Fuel Tank', panel: 'fuel', group: g, pick: [hit, shell], rect: [7.8, -7.0, 10.6, -4.2],
+    anchor: new THREE.Vector3(9.2, 2.6, -5.6), spots: [], lamps,
+    update(dt, tt) {
       const f = fuel.value;
-      shown += (f.level - shown) * Math.min(1, dt * 2.5);
-      const lvl = Math.max(0.02, Math.min(1, shown));
-      liquid.scale.y = H * lvl * (1 + Math.sin(t * 3) * 0.004);
-      liqMat.uniforms.uTime.value = t;
+      shown += (f.level - shown) * Math.min(1, dt * 2);
+      const lvl = Math.max(0.015, shown);
+      const hgt = H * lvl;
+      liquid.scale.y = hgt / 16;
+      surface.position.y = (8 + hgt) * U + Math.sin(tt * 2) * 0.008;
+      surface.rotation.y += dt * 0.2;
       const crit = f.tier === 'critical' || f.tier === 'empty';
-      liqMat.uniforms.uAlarm.value = crit ? 1 : 0;
-      (liqMat.uniforms.uBright.value as THREE.Color).set(f.tier === 'full' ? '#a8ff7a' : f.tier === 'half' ? '#9dfff0' : f.tier === 'quarter' ? '#ffd27a' : '#ff8a6a');
-      (liqMat.uniforms.uDeep.value as THREE.Color).set(f.tier === 'full' ? '#1f7a2a' : f.tier === 'half' ? '#1a6a6a' : f.tier === 'quarter' ? '#8a5a10' : '#7a1a14');
-      tankLight.color.set(f.tier === 'full' ? 0x8cf56b : f.tier === 'half' ? 0x52f2ff : f.tier === 'quarter' ? 0xffbe3d : 0xff4a3a);
-      tankLight.intensity = 8 + Math.sin(t * 2) * 1.5 + (crit ? Math.sin(t * 9) * 4 : 0);
-      const blink = Math.floor(t * 3) % 2 === 0;
-      for (const m of markers) m.lampMat.color.setHex(lvl <= m.k + 0.001 ? (blink ? m.col : 0x3a1a0a) : 0x1d2420);
-      const warn = f.tier === 'quarter' || crit;
-      beacons.forEach((b, i) => {
-        b.rotation.y = warn ? t * (crit ? 7 : 4) + i * Math.PI : 0;
-        const beam = b.children[1] as THREE.Mesh; const bm = beam.material as THREE.MeshBasicMaterial;
-        bm.opacity = warn ? 0.22 : 0; bm.color.setHex(crit ? 0xff3020 : 0xffa020);
-        ((b.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial).color.setHex(warn ? (crit ? 0xff3020 : 0xffa020) : 0x331a0a);
+      liquidMat.color.setRGB(crit ? 1.5 : f.tier === 'quarter' ? 1.5 : 1, crit ? 0.55 : f.tier === 'quarter' ? 1.1 : 1.3, crit ? 0.5 : 0.8);
+      markers.forEach((mk, i) => {
+        const below = f.level < mk;
+        const k = below ? (Math.sin(tt * (crit ? 12 : 7)) > 0 ? 2.6 : 0.25) : 1.4;
+        lamps[i].color.set(below ? (mk <= 0.1 ? PAL.red : PAL.amber) : PAL.glob).multiplyScalar(k);
       });
-      if (Math.random() < dt * (2 + lvl * 6)) fx.emit({ tile: 'bubble', pos: [9.2 + (Math.random() - 0.5) * 1.6, BASE + 0.2, -5.6 + (Math.random() - 0.5) * 1.6], vel: [0, 0.6 + Math.random() * 0.5, 0], spread: [0.05, 0.1, 0.05], life: Math.max(0.4, H * lvl / 1.0), size: [0.08, 0.16], color: '#d8ffe0', wobble: 0.3 });
-      const txt = `${Math.round(f.level * 100)}%`;
-      if (txt !== lastTxt || crit) {
-        lastTxt = txt;
-        ctx.fillStyle = '#05100a'; ctx.fillRect(0, 0, 64, 20);
-        pixText(ctx, txt, 4, 4, 2, f.tier === 'full' ? '#8cf56b' : f.tier === 'half' ? '#52f2ff' : f.tier === 'quarter' ? '#ffbe3d' : (blink ? '#ff5a5a' : '#5a1a1a'));
-        rtex.needsUpdate = true;
+      const alarm = f.tier !== 'full' && f.tier !== 'half';
+      beacons.rotation.y += dt * (alarm ? 6 : 0.6);
+      beaconMat.color.set(crit ? PAL.red : PAL.amber).multiplyScalar(alarm ? 2.4 : 0.35);
+      beam.intensity = alarm ? 40 : 0;
+      beam.color.setHex(crit ? 0xff2a1a : 0xffa020);
+      bubbleT -= dt;
+      if (bubbleT <= 0) {
+        bubbleT = 0.05 + (1 - lvl) * 0.2;
+        const a = Math.random() * Math.PI * 2, r = Math.random() * (R - 4) * U;
+        fx.emit({ tile: 'bubble', pos: [9.2 + Math.cos(a) * r, 8 * U + 0.05, -5.6 + Math.sin(a) * r], vel: [0, 0.9 + Math.random() * 0.6, 0], life: Math.max(0.2, (hgt * U) / 1.2), size: 0.05 + Math.random() * 0.05, color: '#d8ffd0', wobble: 0.3 });
       }
     },
   };
 }
 
-// ── GENE-O-MAT VENDING MACHINE ───────────────────────────────────────────────
+// ── GENE-O-MAT ───────────────────────────────────────────────────────────────
 function vending(): Station {
   const g = new THREE.Group();
-  const v = new Vox();
-  v.rbox(0, 0, 0, 12, 20, 8, 1, 0x5a2a6b);
-  v.box(1, 2, 8, 11, 17, 9, 0x1a0f22);
-  v.box(1, 1, 8, 8, 2, 9, 0x111111);
-  v.box(9, 6, 8, 11, 9, 9, 0x2b2b2b).set(10, 7, 9, 0xffe27a, 2.5);
-  v.box(0, 20, 0, 12, 21, 8, 0x3a1a46);
-  const body = voxMesh(v, { size: S, center: 'xz' });
+  g.position.set(11.15, 0, -1.4); g.rotation.y = -Math.PI / 2;
+  const v = grid([-15, 0, -10], [15, 56, 12], 1.5);
+  v.add(S.box([-14, 0, -9], [14, 52, 9], 1.6), (x, y) => (y < 2 ? PAL.hullDeep : Math.abs(x) > 12.4 ? PAL.pink : 0xd84aaf), M.solid);
+  v.carve(S.box([-12, 18, 6], [5, 46, 10]));
+  v.add(S.box([-12, 18, 6], [5, 46, 6.8]), 0x1a0f22, M.solid);
+  // capsule rows (each a voxel gene capsule: two-tone with a glowing helix stripe)
+  const caps = [PAL.glob, PAL.cyan, PAL.amber, PAL.violet, PAL.pink];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    const x = -9.6 + c * 4.1, y = 21.5 + r * 6.4;
+    v.add(S.box([x - 1.8, y - 2.4, 6.8], [x + 1.8, y - 2, 9]), PAL.chrome, M.metal);
+    v.add(S.capsule([x, y - 0.6, 7.8], [x, y + 1.8, 7.8], 1.2), (px, py) => (py > y + 0.6 ? 0xf6f6f6 : caps[(r + c) % 5]), M.jelly);
+    v.add(S.box([x - 0.25, y - 0.4, 8.8], [x + 0.25, y + 1.6, 9.1]), 0xffffff, M.glow);
+  }
+  v.add(S.box([-12.4, 17.6, 9], [5.4, 46.4, 9.6]), PAL.glass, M.glass);
+  // keypad & coin slot panel
+  v.add(S.box([6.5, 20, 6], [12.5, 44, 9.4], 0.4), PAL.hullDark, M.metal);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) v.add(S.box([7.4 + c * 1.8, 30 + r * 2.2, 9.4], [8.6 + c * 1.8, 31.4 + r * 2.2, 10]), (r + c) % 4 === 0 ? 0xffffff : 0x8a9aa4, (r + c) % 4 === 0 ? M.glow : M.metal);
+  v.add(S.box([8.5, 24, 9.4], [10.5, 26.6, 9.8]), PAL.hazardK, M.solid);
+  v.add(S.box([7, 40, 9.4], [12, 43, 9.8]), 0x2fd8ff, M.glow);
+  v.add(S.box([-10, 5, 8], [8, 12, 9.6], 0.6), PAL.hullDeep, M.metal);                       // dispense tray
+  // sign
+  v.add(S.box([-14, 46.5, 7], [14, 55, 10], 1), 0x2a0f2a, M.solid);
+  stampText(v, 'GENE-O-MAT', -textWidth('GENE-O-MAT', 0.95) / 2, 53.2, 10, 0.95, 0xffffff, M.glow, 0.6);
+  const body = setGlow(mesh(v), glowMat(0xffc8f0, 1.8));
   g.add(body);
-  const front = pixTex(64, 96, (ctx) => {
-    ctx.fillStyle = '#12081a'; ctx.fillRect(0, 0, 64, 96);
-    const items = ['#8cf56b', '#ff6fd6', '#52f2ff', '#ffbe3d', '#b48cff', '#ff5a5a'];
-    for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) {
-      const x = 4 + c * 20, y = 6 + r * 22;
-      ctx.fillStyle = '#2a1636'; ctx.fillRect(x, y + 14, 16, 2);
-      ctx.fillStyle = items[(r * 3 + c) % items.length];
-      if ((r + c) % 3 === 0) pixEllipse(ctx, x + 8, y + 8, 5, 5, ctx.fillStyle as string);
-      else if ((r + c) % 3 === 1) ctx.fillRect(x + 3, y + 3, 10, 11);
-      else { ctx.fillRect(x + 6, y + 2, 4, 12); ctx.fillRect(x + 3, y + 6, 10, 4); }
-      pixText(ctx, `${(r + 1) * 15}`, x + 2, y + 17, 1, '#ffe27a');
-    }
-  });
-  const scr = screenMesh(10 * S, 15 * S, front, 1.25); scr.position.set(0, 9.5 * S, 4.5 * S + 0.04); g.add(scr);
-  const sign = neonText('GENE-O-MAT', [0xff6fd6, 0x8cf56b], 0.034, 3.2); sign.group.position.set(-0.6 * 1.6 / 1.6 - 0.18, 18.2 * S, 4.5 * S + 0.06); g.add(sign.group);
-  const hit = hitBox(1.6, 2.6, 1.2); g.add(hit);
-  const lbl = label('SHOP', '#ff6fd6'); lbl.position.set(0, 2.95, 0.3); g.add(lbl);
-  g.position.set(11.0, 0, -1.4); g.rotation.y = -Math.PI / 2;
-  return { id: 'vending', label: 'GENE-O-MAT Shop', panel: 'shop', group: g, pick: [hit, body], rect: [10.3, -2.3, 11.8, -0.5], anchor: new THREE.Vector3(10.6, 1.4, -1.4), spots: [] };
+  const hit = hitBox(1.9, 3.5, 1.4); g.add(hit);
+  return { id: 'vending', label: 'GENE-O-MAT', panel: 'shop', group: g, pick: [hit, body], rect: [10.3, -2.3, 11.8, -0.5], anchor: new THREE.Vector3(10.6, 1.7, -1.4), spots: [] };
 }
 
 // ── WARDROBE POD ─────────────────────────────────────────────────────────────
 function wardrobe(): Station {
   const g = new THREE.Group();
-  const v = new Vox();
-  v.rbox(0, 0, 0, 14, 22, 8, 3, 0x1f6b6b);
-  v.box(2, 2, 7, 12, 19, 9, 0x123c3c);
-  v.box(0, 22, 2, 14, 23, 6, 0x2a8a8a);
-  // hats on pegs on top
-  v.box(2, 23, 3, 5, 25, 5, 0xffe14d).box(1, 23, 3, 6, 24, 5, 0xffe14d);
-  v.box(9, 23, 3, 12, 26, 5, 0x222222).box(8, 23, 3, 13, 24, 5, 0x222222).box(9, 24, 3, 12, 25, 5, 0xff6fd6);
-  const body = voxMesh(v, { size: S, center: 'xz' });
+  g.position.set(11.15, 0, 2.6); g.rotation.y = -Math.PI / 2;
+  const w = grid([-16, 0, -10], [16, 60, 12], 1.5);
+  w.add(smoothUnion2(w), (x, y, z) => (Math.abs(x) > 13.4 ? PAL.hullHi : y < 3 ? PAL.hullDeep : plate(0xd9d2bd, x + 16, y, { pw: 32, ph: 14, bolt: false })), M.metal);
+  w.carve(S.box([-10, 6, 4], [10, 50, 12]));
+  w.add(S.box([-10, 6, 3], [10, 50, 4]), 0x9ab4c4, M.gloss);                                     // mirror
+  w.add(S.box([-9, 44, 3.9], [-2, 48, 4.1]), 0xe8f4ff, M.glow);                                   // mirror glint
+  for (let i = 0; i < 20; i++) w.add(S.sphere([-11.4 + (i % 2) * 22.8, 8 + Math.floor(i / 2) * 4.4, 5], 0.8), 0xffffff, M.glow); // vanity bulbs
+  // hat rack on top
+  w.add(S.capsule([-12, 58, 0], [12, 58, 0], 0.6), PAL.chrome, M.metal);
+  w.add(S.cone(-7, 0, 58, 64, 3.4, 0.6), 0x8a3fd8, M.solid);                                     // wizard hat
+  w.add(S.cyl(0, 0, 2.6, 58, 61), 0x1a1a1a, M.solid); w.add(S.cyl(0, 0, 4, 58, 58.6), 0x1a1a1a, M.solid); // top hat
+  w.add(S.ellipsoid([7, 59, 0], [3.4, 1.8, 3.4]), 0xf2b632, M.metal);                            // hard hat
+  stampText(w, 'STYLE', -textWidth('STYLE', 0.8) / 2, 54.6, 8.6, 0.8, PAL.pink, M.glow, 0.6);
+  const body = setGlow(mesh(w), glowMat(0xffe8c8, 1.7));
   g.add(body);
-  const mirror = new THREE.Mesh(new THREE.CircleGeometry(0.55, 24), new THREE.MeshStandardMaterial({ color: 0xcfeff0, metalness: 1, roughness: 0.06, envMapIntensity: 1.6 }));
-  mirror.scale.y = 1.7; mirror.position.set(0, 10.5 * S, 4.5 * S + 0.08); g.add(mirror);
-  const sparkleT = pixTex(16, 16, (ctx) => { ctx.fillStyle = '#fff'; ctx.fillRect(7, 2, 2, 12); ctx.fillRect(2, 7, 12, 2); });
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sparkleT, toneMapped: false, transparent: true, color: new THREE.Color(2, 2, 2) }));
-  sp.scale.setScalar(0.18); sp.position.set(0.25, 1.75, 0.65); g.add(sp);
-  const sign = neonText('WARDROBE', [0x52f2ff], 0.034, 3); sign.group.position.set(-0.8, 20 * S, 4.5 * S + 0.1); g.add(sign.group);
-  const hit = hitBox(1.8, 3, 1.2); g.add(hit);
-  g.position.set(11.0, 0, 2.6); g.rotation.y = -Math.PI / 2;
-  return { id: 'wardrobe', label: 'Wardrobe Pod', panel: 'wardrobe', group: g, pick: [hit, body], rect: [10.3, 1.6, 11.8, 3.6], anchor: new THREE.Vector3(10.6, 1.4, 2.6), spots: [],
-    update(_dt, t) { sp.material.opacity = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.7)); sp.position.y = 1.6 + Math.sin(t * 0.9) * 0.25; } };
+  const hit = hitBox(2, 3.8, 1.4); g.add(hit);
+  return { id: 'wardrobe', label: 'Wardrobe Pod', panel: 'wardrobe', group: g, pick: [hit, body], rect: [10.3, 1.6, 11.8, 3.6], anchor: new THREE.Vector3(10.6, 1.7, 2.6), spots: [] };
 }
+function smoothUnion2(_g: unknown) { return S.box([-15, 0, -9], [15, 56, 9], 4); }
 
-// ── FILE CABINET ─────────────────────────────────────────────────────────────
+// ── FILE ARCHIVE ─────────────────────────────────────────────────────────────
 function cabinet(): Station {
   const g = new THREE.Group();
-  const v = new Vox();
-  v.box(0, 0, 0, 7, 16, 6, 0x6f7a73);
-  for (let d = 0; d < 4; d++) { v.box(0, d * 4 + 1, 6, 7, d * 4 + 4, 7, 0x7f8b84); v.box(2, d * 4 + 2, 7, 5, d * 4 + 3, 8, 0x3a403c); v.box(1, d * 4 + 3, 7, 3, d * 4 + 4, 7 + 1, 0xeeeedd); }
-  // open top drawer with files
-  v.box(0, 13, 7, 7, 16, 10, 0x7f8b84).box(1, 15, 7, 6, 17, 9, 0xffe27a).box(2, 15, 8, 3, 18, 9, 0xff6fd6);
-  v.box(1, 16, 1, 6, 19, 5, 0xc9a26a);
-  const body = voxMesh(v, { size: S, center: 'xz', material: MAT.metal });
-  g.add(body);
-  const hit = hitBox(1, 2.2, 1); g.add(hit);
   g.position.set(-11.2, 0, -3.6); g.rotation.y = Math.PI / 2;
+  const c = grid([-10, 0, -8], [10, 60, 10], 1.5);
+  c.add(S.box([-9.6, 0, -7], [9.6, 58, 7], 1), PAL.hullDark, M.metal);
+  for (let r = 0; r < 6; r++) for (let k = 0; k < 2; k++) {
+    const y = 3 + r * 9, x0 = -8.6 + k * 8.8;
+    c.add(S.box([x0, y, 6], [x0 + 8.2, y + 8, 8], 0.5), (x, yy) => (yy > y + 6 && yy < y + 7.2 && Math.abs(x - x0 - 4.1) < 1.6 ? PAL.chrome : [0x4a6a8a, 0x6a8a4a, 0x8a6a4a][(r + k) % 3]), M.metal);
+    c.add(S.box([x0 + 1, y + 2, 8], [x0 + 3, y + 3.4, 8.4]), [PAL.pink, PAL.cyan, PAL.amber, PAL.glob][(r * 2 + k) % 4], M.glow);
+  }
+  // overflowing folders on top
+  for (let i = 0; i < 5; i++) c.add(S.box([-7 + i * 3, 58, -4 + (i % 2)], [-4.6 + i * 3, 64 - (i % 3), 3]), [0xefe2b8, 0xf6c8a0, 0xd8f0c8][i % 3], M.solid);
+  const body = setGlow(mesh(c), glowMat(0xffffff, 1.6));
+  g.add(body);
+  const hit = hitBox(1.3, 4, 1.2); g.add(hit);
   const spots: Spot[] = [{ id: 'cabinet', station: 'cabinet', pos: new THREE.Vector3(-10.1, 0, -3.6), face: -Math.PI / 2, anim: 'carry' }];
-  return { id: 'cabinet', label: 'File Cabinet', group: g, pick: [hit], rect: [-11.8, -4.2, -10.6, -3.0], anchor: new THREE.Vector3(-10.8, 1, -3.6), spots, panel: 'terminal' };
+  return { id: 'cabinet', label: 'File Archive', group: g, pick: [hit, body], rect: [-11.8, -4.2, -10.6, -3.0], anchor: new THREE.Vector3(-10.8, 1.3, -3.6), spots, panel: 'terminal' };
 }
 
-// ── RESEARCH: bookshelf + satellite dish + telescope ─────────────────────────
+// ── RESEARCH: data shelves + deep-space scanner ──────────────────────────────
 function research(): Station {
   const g = new THREE.Group();
-  const v = new Vox();
-  v.box(0, 0, 0, 18, 20, 5, 0x4d3520);
-  for (let s = 0; s < 4; s++) {
-    v.box(1, s * 5 + 1, 1, 17, s * 5 + 5, 5, 0x1a120c);
-    let x = 1;
-    while (x < 17) { const w = 1 + Math.floor(Math.random() * 2), h = 2 + Math.floor(Math.random() * 3); const cc = [0xb23a48, 0x2f6b8f, 0x8cf56b, 0xffbe3d, 0xb48cff, 0xeeeedd][Math.floor(Math.random() * 6)]; v.box(x, s * 5 + 1, 2, Math.min(17, x + w), s * 5 + 1 + h, 5, cc); x += w; }
+  const s = grid([-10, 0, -20], [10, 64, 34], 1.5);
+  // data shelves (world x -11.9..-10.7, z -0.4..2.0) → local, built facing +x via rotation later
+  s.add(S.box([-9, 0, -4], [9, 56, 6]), PAL.hullDark, M.metal);
+  for (let r = 0; r < 5; r++) {
+    const y = 4 + r * 10.4;
+    s.add(S.box([-8.4, y, -3], [8.4, y + 1, 6]), PAL.steel, M.metal);
+    for (let i = 0; i < 8; i++) {
+      const h = 5 + ((hash3(i, r, 9) * 4) | 0);
+      const crystal = (i + r) % 3 === 0;
+      if (crystal) s.add(S.capsule([-7 + i * 2, y + 1, 2], [-7 + i * 2, y + h, 2], 0.7), [PAL.cyan, PAL.violet, PAL.glob][(i + r) % 3], M.glow);
+      else s.add(S.box([-7.8 + i * 2, y + 1, -1], [-6.4 + i * 2, y + 1 + h, 5]), [0x8a3a3a, 0x3a5a8a, 0x3a8a5a, 0x8a7a3a][(i * 3 + r) % 4], M.solid);
+    }
   }
-  v.box(14, 21, 1, 17, 23, 4, 0x8cf56b, 1.6); // glowing specimen jar on top
-  const shelf = voxMesh(v, { size: S, center: 'xz' });
-  shelf.rotation.y = Math.PI / 2; shelf.position.set(-11.4, 0, 0.8);
-  g.add(shelf);
-  // telescope on tripod pointing out the window
-  const tv = new Vox();
-  tv.box(0, 0, 0, 1, 8, 1, 0x39433d).box(4, 0, 0, 5, 8, 1, 0x39433d).box(2, 0, 4, 3, 8, 5, 0x39433d).box(1, 8, 1, 4, 9, 4, 0x56645e);
-  for (let i = 0; i < 12; i++) tv.box(2, 9 + Math.floor(i * 0.6), 2 - i, 4, 11 + Math.floor(i * 0.6), 4 - i, i > 9 ? 0xd9d4c0 : 0x2f6b8f);
-  tv.box(1, 16, -11, 5, 18, -9, 0x52f2ff, 2.2);
-  const tel = voxMesh(tv, { size: S, center: 'xz', material: MAT.metal });
-  tel.position.set(-8.9, 0, -1.6); tel.rotation.y = 0.5;
-  g.add(tel);
-  // satellite dish on the wall top
-  const dv = new Vox();
-  for (let y = 0; y < 3; y++) dv.cyl(0, 0, 5 - y * 1.5, y, y + 1, 0xd9d4c0, 0, 1);
-  dv.box(-0.5, 0, -0.5, 0.5, 7, 0.5, 0x56645e).set(0, 7, 0, 0xff6fd6, 3);
-  const dish = voxMesh(dv, { size: 0.1, center: 'xz', material: MAT.metal });
-  const dishG = new THREE.Group(); dishG.add(dish); dish.rotation.x = -0.9;
-  dishG.position.set(-11.3, 4.6, -1.0);
-  g.add(dishG);
-  const hit = hitBox(1.2, 2.6, 2.6); hit.position.set(-11.1, 1.3, 0.8); g.add(hit);
-  const lbl = label('RESEARCH', '#52f2ff'); lbl.rotation.y = Math.PI / 2; lbl.position.set(-11.2, 2.85, 0.8); g.add(lbl);
+  // deep-space scanner on a tripod (world ≈ (-11.2, -1.7))
+  const sc = new THREE.Group();
+  const t = grid([-10, 0, -10], [10, 70, 10], 2);
+  for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; t.add(S.capsule([Math.cos(a) * 8, 0, Math.sin(a) * 8], [0, 26, 0], 0.7), PAL.steelDark, M.metal); }
+  t.add(S.sphere([0, 27, 0], 2.4), PAL.steel, M.metal);
+  t.add(S.capsule([0, 28, 0], [6, 52, -2], 3.4, 4.2), (x, y) => (Math.floor(y) % 8 < 1 ? PAL.chrome : PAL.paintCream), M.metal);
+  t.add(S.disc([6.4, 53.6, -2], [0.25, 1, -0.08], 4.4, 0.6), 0x2fd8ff, M.glow);
+  t.add(S.capsule([-1, 30, 1], [-3, 26, 4], 0.9), PAL.hullDark, M.metal);                                  // eyepiece
+  t.add(S.box([3, 16, 3], [9, 22, 5], 0.4), PAL.hullDeep, M.metal);                                         // readout box
+  t.add(S.box([4, 17, 5], [8, 21, 5.4]), 0x0a2a1a, M.glow);
+  const scope = setGlow(mesh(t), glowMat(PAL.cyan, 1.7));
+  sc.add(scope);
+  sc.position.set(-11.0, 0, -1.7);
+  const shelves = setGlow(mesh(s), glowMat(0xd8fff8, 1.7));
+  shelves.position.set(-11.3, 0, 0.8); shelves.rotation.y = Math.PI / 2;
+  g.add(shelves, sc);
+  const hit = hitBox(1.2, 3.6, 2.4); hit.position.set(-11.3, 0, 0.8); g.add(hit);
   const spots: Spot[] = [
-    { id: 'books', station: 'research', pos: new THREE.Vector3(-10.0, 0, 0.6), face: -Math.PI / 2, anim: 'research' },
-    { id: 'scope', station: 'research', pos: new THREE.Vector3(-8.4, 0, -0.9), face: 0.5 + Math.PI, anim: 'research' },
+    { id: 'books', station: 'research', pos: new THREE.Vector3(-10.0, 0, 0.8), face: -Math.PI / 2, anim: 'research' },
+    { id: 'scope', station: 'research', pos: new THREE.Vector3(-9.9, 0, -1.7), face: -Math.PI / 2, anim: 'research' },
   ];
-  return { id: 'research', label: 'Research Station', group: g, pick: [hit, tel], rect: [-11.9, -0.4, -10.7, 2.0], anchor: new THREE.Vector3(-10, 1.5, 0.3), spots,
-    update(_dt, t) { dishG.rotation.y = Math.sin(t * 0.3) * 0.8; } };
+  return {
+    id: 'research', label: 'Deep-Space Scanner', group: g, pick: [hit, scope, shelves], rect: [-11.9, -2.5, -10.6, 2.0], anchor: new THREE.Vector3(-10.8, 1.8, -0.4), spots,
+    update(dt) { sc.rotation.y += dt * (anyDoing('research') ? 0.9 : 0.12); },
+  };
 }
 
-// ── CLONING VAT ──────────────────────────────────────────────────────────────
+// ── CLONING PODS ─────────────────────────────────────────────────────────────
 function cloningVat(fx: Particles): Station & { spawnPoint: THREE.Vector3; flash(): void } {
   const g = new THREE.Group();
-  const v = new Vox();
-  v.cyl(0, 0, 8, 0, 4, (x, y) => (y === 3 ? 0x56645e : 0x2b3631));
-  for (let a = 0; a < 8; a++) { const ang = (a / 8) * Math.PI * 2; v.set(Math.round(Math.cos(ang) * 7.5), 2, Math.round(Math.sin(ang) * 7.5), a % 2 ? 0x8cf56b : 0xff6fd6, 2.6); }
-  const base = voxMesh(v, { size: S, center: 'none', origin: [0, 0, 0], material: MAT.metal });
-  const cap = new Vox(); cap.cyl(0, 0, 8, 0, 2, 0x39433d).cyl(0, 0, 3, 2, 4, 0x56645e);
-  const capM = voxMesh(cap, { size: S, center: 'none', origin: [0, 0, 0], material: MAT.metal }); capM.position.y = 0.5 + 2.6;
-  g.add(base, capM);
-  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 0.86, 2.6, 28, 1, true), new THREE.MeshStandardMaterial({ color: 0xbfffe0, transparent: true, opacity: 0.18, roughness: 0.04, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 2 }));
-  glass.position.y = 0.5 + 1.3; glass.renderOrder = 5;
-  const jellyMat = new THREE.ShaderMaterial({ vertexShader: LIQUID_VERT, fragmentShader: LIQUID_FRAG, transparent: true, toneMapped: false,
-    uniforms: { uTime: { value: 0 }, uDeep: { value: new THREE.Color('#1a5a3a') }, uBright: { value: new THREE.Color('#7affb0') }, uAlarm: { value: 0 } } });
-  const jelly = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 2.2, 28), jellyMat); jelly.position.y = 0.5 + 1.1;
-  // dormant clone silhouette floating inside
-  const sil = new Vox(); sil.rbox(0, 4, 0, 6, 9, 5, 1.5, 0x0d2a18).rbox(1, 0, 1, 5, 5, 4, 1, 0x0d2a18).set(1, 9, 2, 0x0d2a18).set(1, 10, 2, 0x0d2a18).set(4, 9, 2, 0x0d2a18).set(4, 10, 2, 0x0d2a18);
-  const silM = voxMesh(sil, { size: 0.1, center: 'xz' }); silM.position.y = 1.0;
-  g.add(jelly, silM, glass);
-  const light = new THREE.PointLight(0x7affb0, 8, 6, 1.6); light.position.set(0, 1.6, 1.2); g.add(light);
-  const hit = hitBox(2, 3.4, 2); g.add(hit);
-  const lbl = label('CLONE VAT', '#8cf56b'); lbl.position.set(0, 3.6, 0); g.add(lbl);
-  g.position.set(-9.3, 0, -6.1);
+  g.position.set(-9.3, 0, -6.4);
+  const v = grid([-20, 0, -16], [20, 72, 14], 1.5);
+  const pod = (cx: number) => {
+    v.add(S.cyl(cx, 0, 9, 0, 6), (x, y, z) => (y > 4.6 ? PAL.hullHi : hazard(Math.atan2(z, x - cx) * 8, y, 2)), M.metal);
+    v.add(S.cyl(cx, 0, 9, 58, 66), (x, y, z) => plate(PAL.hullDark, Math.atan2(z, x - cx) * 10, y, { pw: 6, ph: 8 }), M.metal);
+    v.add(S.cone(cx, 0, 66, 70, 6, 2), PAL.steelDark, M.metal);
+    v.add(S.cyl(cx, 0, 8, 6, 58), PAL.glass, M.glass);
+    v.carve(S.cyl(cx, 0, 7.2, 6, 58));
+    for (let i = 0; i < 4; i++) { const a = (i / 4) * Math.PI * 2 + Math.PI / 4; v.add(S.box([cx + Math.cos(a) * 8.6 - 0.8, 6, Math.sin(a) * 8.6 - 0.8], [cx + Math.cos(a) * 8.6 + 0.8, 58, Math.sin(a) * 8.6 + 0.8]), PAL.steel, M.metal); }
+    v.add(S.cyl(cx, 0, 6.8, 6, 46), (x, y, z) => (Math.sin(y * 0.5 + Math.atan2(z, x - cx) * 2) > 0.85 ? 0xffffff : 0x7fe87a), M.glow);
+  };
+  pod(-9); pod(9);
+  // control console between pods
+  v.add(S.box([-4, 0, 2], [4, 22, 10], 0.8), PAL.hullDark, M.metal);
+  v.add(S.box([-3.4, 16, 9.4], [3.4, 21, 10.2]), (x, y) => ((Math.floor(x) + Math.floor(y)) % 3 === 0 ? 0xffffff : 0x1a4a2a), M.glow);
+  v.add(S.capsule([-2, 23, 6], [-2, 26, 7], 0.5), PAL.chrome, M.metal); v.add(S.sphere([-2, 26.6, 7], 1), PAL.red, M.jelly);
+  stampText(v, 'CLONE', -textWidth('CLONE', 0.7) / 2, 13, 10, 0.7, PAL.glob, M.glow, 0.5);
+  const liquidMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1, 1.25, 1), toneMapped: false, transparent: true, opacity: 0.6, depthWrite: false });
+  const body = mesh(v);
+  body.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh && m.userData.voxMat === M.glow) { m.material = liquidMat; m.renderOrder = 1; } });
+  g.add(body);
+  // floating embryo-blobs inside each pod
+  const blobs: THREE.Object3D[] = [];
+  for (const cx of [-9, 9]) {
+    const b = grid([-4, -4, -4], [4, 4, 4], 3);
+    b.add(S.ellipsoid([0, 0, 0], [2.6, 3, 2.6]), 0x8cf56b, M.jelly);
+    for (const sx of [-1, 1]) b.add(S.sphere([sx * 1, 0.6, 2.2], 0.8), 0x05070a, M.gloss);
+    const bo = mesh(b); bo.position.set(cx * U, 28 * U, 0); g.add(bo); blobs.push(bo);
+  }
+  const light = new THREE.PointLight(0x8cf56b, 4, 6, 1.6); light.position.set(0, 2.2, 1.2); g.add(light);
+  const hit = hitBox(2.4, 4.2, 1.8); g.add(hit);
   let flashT = 0;
-  const spawnPoint = new THREE.Vector3(-9.3, 0, -4.9);
+  const spawnPoint = new THREE.Vector3(-9.3, 0, -4.7);
   return {
-    id: 'vat', label: 'Cloning Vat', group: g, pick: [hit], rect: [-10.4, -7.3, -8.2, -5.0], anchor: new THREE.Vector3(-9.3, 1.6, -6.1),
+    id: 'vat', label: 'Cloning Pods', group: g, pick: [hit, body], rect: [-10.6, -7.6, -8.0, -5.4], anchor: new THREE.Vector3(-9.3, 1.9, -6.2),
     spots: [
-      { id: 'vat0', station: 'vat', pos: new THREE.Vector3(-7.9, 0, -5.3), face: -Math.PI / 2 - 0.4, anim: 'vat' },
-      { id: 'vat1', station: 'vat', pos: new THREE.Vector3(-9.3, 0, -4.5), face: Math.PI, anim: 'vat' },
+      { id: 'vat0', station: 'vat', pos: new THREE.Vector3(-7.6, 0, -5.4), face: -Math.PI / 2 - 0.4, anim: 'vat' },
+      { id: 'vat1', station: 'vat', pos: new THREE.Vector3(-9.3, 0, -4.6), face: Math.PI, anim: 'vat' },
     ],
     spawnPoint,
-    flash() { flashT = 1; fx.emit({ tile: ['ring'], pos: [spawnPoint.x, 0.6, spawnPoint.z], count: 3, life: 0.6, size: 0.6, grow: 4, color: '#8cf56b', additive: true }); fx.emit({ tile: ['sparkle', 'star', 'glob'], pos: [spawnPoint.x, 0.8, spawnPoint.z], count: 24, vel: [0, 1.5, 0], spread: [1.8, 1.2, 1.8], drag: 1.5, life: [0.6, 1.1], size: [0.12, 0.22], color: ['#8cf56b', '#c8ffb0', '#52f2ff'], additive: true }); },
+    flash() {
+      flashT = 1;
+      fx.emit({ tile: 'ring', pos: [spawnPoint.x, 0.6, spawnPoint.z], count: 3, life: 0.6, size: 0.5, grow: 4, color: '#8cf56b', additive: true });
+      fx.emit({ tile: ['sparkle', 'star', 'glob'], pos: [spawnPoint.x, 0.8, spawnPoint.z], count: 30, vel: [0, 1.6, 0], spread: [2, 1.4, 2], drag: 1.5, life: [0.6, 1.2], size: [0.06, 0.12], color: ['#8cf56b', '#c8ffb0', '#52f2ff'], additive: true });
+    },
     update(dt, t) {
-      jellyMat.uniforms.uTime.value = t;
-      silM.position.y = 1.0 + Math.sin(t * 1.3) * 0.12; silM.rotation.y = Math.sin(t * 0.4) * 0.5;
       flashT = Math.max(0, flashT - dt * 1.5);
-      light.intensity = 7 + Math.sin(t * 2.3) * 1.2 + flashT * 30;
-      if (Math.random() < dt * 5) fx.emit({ tile: 'bubble', pos: [-9.3 + (Math.random() - 0.5) * 1.2, 0.7, -6.1 + (Math.random() - 0.5) * 1.2], vel: [0, 0.8, 0], spread: [0.05, 0.2, 0.05], life: 2.2, size: [0.07, 0.14], color: '#d8ffe0', wobble: 0.3 });
+      light.intensity = 4 + Math.sin(t * 2.3) * 0.8 + flashT * 24;
+      liquidMat.color.setRGB(1 + flashT, 1.25 + flashT, 1 + flashT);
+      blobs.forEach((b, i) => { b.position.y = 28 * U + Math.sin(t * 1.3 + i * 2) * 0.12; b.rotation.y = Math.sin(t * 0.7 + i) * 0.8; });
+      if (Math.random() < dt * 6) fx.emit({ tile: 'bubble', pos: [-9.3 + (Math.random() < 0.5 ? -9 : 9) * U + (Math.random() - 0.5) * 0.6, 0.5, -6.4 + (Math.random() - 0.5) * 0.6], vel: [0, 0.8, 0], life: 2.2, size: 0.05, color: '#e8ffe0', wobble: 0.2 });
     },
   };
 }
 
-// ── WHITEBOARD ───────────────────────────────────────────────────────────────
+// ── HOLO-PLANNER (was the whiteboard) ────────────────────────────────────────
 function whiteboard(): Station {
   const g = new THREE.Group();
-  const v = new Vox();
-  v.box(0, 0, 0, 1, 20, 1, 0x56645e).box(23, 0, 0, 24, 20, 1, 0x56645e).box(0, 8, 0, 24, 21, 1, 0xd9d4c0);
-  const frame = voxMesh(v, { size: S, center: 'xz', material: MAT.metal });
-  const tex = pixTex(96, 52, (ctx) => {
-    ctx.fillStyle = '#f1f4ea'; ctx.fillRect(0, 0, 96, 52);
-    pixText(ctx, 'TODO:', 3, 3, 1, '#2f6b8f');
-    pixText(ctx, '1.WORLD DOM. ✓', 3, 13, 1, '#b23a48');
-    pixText(ctx, '2.SHIP GAME', 3, 22, 1, '#1e6b2a');
-    pixText(ctx, '3.SNACKS!!', 3, 31, 1, '#8a4fbf');
-    ctx.fillStyle = '#ffe27a'; ctx.fillRect(74, 4, 18, 16); ctx.fillStyle = '#ff9ae2'; ctx.fillRect(72, 26, 18, 16);
-    pixText(ctx, 'BUG', 76, 9, 1, '#5a3a00'); pixText(ctx, 'YAY', 74, 31, 1, '#5a0040');
-    ctx.strokeStyle = '#2f6b8f'; ctx.beginPath(); ctx.moveTo(60, 44); ctx.lineTo(70, 36); ctx.lineTo(66, 36); ctx.stroke();
-  });
-  const board = new THREE.Mesh(new THREE.PlaneGeometry(22 * S, 12 * S), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, emissive: new THREE.Color('#ffffff'), emissiveMap: tex, emissiveIntensity: 0.12 }));
-  board.position.set(0, 14.5 * S, 0.5 * S + 0.07);
-  g.add(frame, board);
-  g.position.set(5.4, 0, -7.5);
-  return { id: 'whiteboard', label: 'Planning Board', group: g, pick: [frame], rect: [3.9, -7.9, 6.9, -7.1], anchor: new THREE.Vector3(5.4, 1.6, -7), spots: [{ id: 'wb', station: 'whiteboard', pos: new THREE.Vector3(5.0, 0, -6.4), face: Math.PI, anim: 'scribble' }] };
+  g.position.set(5.4, 0, -7.6);
+  const b = grid([-26, 0, -4], [26, 62, 4], 1.5);
+  b.add(S.box([-24, 18, -3], [24, 56, 0], 1), (x, y) => (Math.min(x + 24, 24 - x, y - 18, 56 - y) < 2.2 ? PAL.hullHi : 0x132028), M.metal);
+  for (const sx of [-1, 1]) b.add(S.box([sx * 20 - 1, 0, -3], [sx * 20 + 1, 18, -1]), PAL.steelDark, M.metal);
+  // voxel sticky notes
+  const notes: [number, number, number][] = [[-19, 49, PAL.amber], [-12, 49, PAL.pink], [-5, 49, PAL.cyan], [-19, 41, PAL.glob], [-12, 41, PAL.amber], [-19, 33, PAL.pink]];
+  for (const [x, y, c] of notes) { b.add(S.box([x, y - 5, 0], [x + 6, y + 1, 0.6]), c, M.solid); for (let i = 0; i < 3; i++) b.add(S.box([x + 1, y - 1 - i * 1.4, 0.6], [x + 5 - i, y - 0.6 - i * 1.4, 0.8]), shade(c, 0.5), M.solid); }
+  stampText(b, 'PLAN', 6, 54.4, 0, 0.9, PAL.cyan, M.glow, 0.5);
+  b.add(S.box([4, 22, 0], [22, 23, 0.4]), PAL.hullHi, M.metal);
+  const body = setGlow(mesh(b), glowMat(0xd8fbff, 1.8));
+  g.add(body);
+  // holo task bars (driven by project tasks)
+  const bars = new VoxBars(1, 1, 1, PAL.cyan, 1.8);
+  void bars;
+  const rows: THREE.Mesh[] = [];
+  const rowMat = [glowMat(PAL.glob, 1.6), glowMat(PAL.amber, 1.6), glowMat(0x3a4a52, 1)];
+  for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2 * U, 0.6 * U), rowMat[2]); m.position.set(13 * U, (48 - i * 4) * U, 0.4 * U); g.add(m); rows.push(m); }
+  const hit = hitBox(3, 2.6, 0.5, 2.3); g.add(hit);
+  let acc = 0;
+  return {
+    id: 'whiteboard', label: 'Holo-Planner', group: g, pick: [hit, body], rect: [3.9, -7.9, 6.9, -7.1], anchor: new THREE.Vector3(5.4, 2.2, -7), spots: [{ id: 'wb', station: 'whiteboard', pos: new THREE.Vector3(5.0, 0, -6.4), face: Math.PI, anim: 'scribble' }],
+    update(dt) {
+      acc += dt; if (acc < 0.3) return; acc = 0;
+      const tasks = projects.value.find((p) => p.id === activeProjectId.value)?.tasks ?? projects.value[0]?.tasks ?? [];
+      rows.forEach((m, i) => {
+        const tk = tasks[i];
+        const w = tk ? 6 + (tk.title.length % 10) : 4 + i;
+        m.scale.x = w * U; m.position.x = (5 + w / 2) * U;
+        m.material = tk ? (tk.status === 'done' ? rowMat[0] : tk.status === 'doing' ? rowMat[1] : rowMat[2]) : rowMat[2];
+        m.visible = !!tk || i < 3;
+      });
+    },
+  };
 }
 
-// ── WORKBENCH + BUGBOX ───────────────────────────────────────────────────────
+// ── WORKBENCH ────────────────────────────────────────────────────────────────
 function workbench(fx: Particles): Station & { zap(): void } {
   const g = new THREE.Group();
-  const v = new Vox();
-  v.box(0, 5, 0, 22, 6, 9, 0x6b4a2e).box(0, 0, 0, 2, 5, 2, 0x39433d).box(20, 0, 0, 22, 5, 2, 0x39433d).box(0, 0, 7, 2, 5, 9, 0x39433d).box(20, 0, 7, 22, 5, 9, 0x39433d);
-  v.box(2, 1, 1, 20, 2, 8, 0x4d3520);
-  // tools
-  v.box(3, 6, 2, 8, 7, 3, 0x9aa69e).box(3, 6, 2, 4, 7, 5, 0x9aa69e);
-  v.box(9, 6, 5, 10, 7, 9, 0x6b4a2e).box(8, 6, 5, 11, 8, 6, 0x56645e);
-  // the BUGBOX: a cranky little machine that sparks when debugging
-  v.rbox(13, 6, 2, 20, 12, 8, 1, 0xb23a48).box(14, 8, 8, 19, 11, 9, 0x111111).set(15, 9, 9, 0xff5a5a, 3).set(18, 9, 9, 0xff5a5a, 3).box(16, 12, 4, 17, 15, 5, 0x9aa69e).set(16, 15, 4, 0xffbe3d, 3);
-  const body = voxMesh(v, { size: S, center: 'xz' });
-  g.add(body);
-  const lbl = label('WORKBENCH', '#ffbe3d'); lbl.position.set(0, 2.3, 0); g.add(lbl);
   g.position.set(5.8, 0, 1.5);
+  const w = grid([-24, 0, -11], [24, 40, 11], 1.5);
+  w.add(S.box([-22, 13, -9], [22, 16, 9], 0.6), (x, _y, z) => plate(0x6a5a4a, x + 22, z + 9, { pw: 11, ph: 18, bolt: false }), M.solid);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) w.add(S.box([sx * 20 - 1.4, 0, sz * 7 - 1.4], [sx * 20 + 1.4, 13, sz * 7 + 1.4]), PAL.steelDark, M.metal);
+  w.add(S.box([-20, 4, -8], [20, 5.4, 8]), PAL.steelDark, M.metal);
+  w.add(S.box([-18, 5.4, -6], [-6, 11, 6], 0.6), PAL.paintRed, M.metal);                          // tool chest
+  for (let i = 0; i < 3; i++) w.add(S.box([-17.4, 6 + i * 1.8, 6], [-6.6, 7.4 + i * 1.8, 6.4]), PAL.chrome, M.metal);
+  // half-built robot buddy on the bench
+  w.add(S.box([-6, 16, -3], [2, 24, 3], 1), PAL.steel, M.metal);
+  w.add(S.sphere([-2, 27, 0], 3.4), PAL.steelDark, M.metal);
+  for (const sx of [-1, 1]) w.add(S.sphere([-2 + sx * 1.3, 27.6, 3], 0.8), 0xffffff, M.glow);
+  w.add(S.capsule([2, 22, 0], [5, 19, 1], 0.7), PAL.cable, M.solid);
+  // sparking machine (the "whack" target)
+  w.add(S.box([10, 16, -6], [20, 26, 5], 1), (x, y) => (y > 24 ? hazard(x, y, 2) : PAL.paintTeal), M.metal);
+  w.add(S.box([12, 18, 5], [18, 23, 5.6]), 0x0a2a1a, M.glow);
+  w.add(S.capsule([15, 26, 0], [15, 31, 0], 0.5), PAL.chrome, M.metal); w.add(S.sphere([15, 31.6, 0], 1.1), PAL.amber, M.glow);
+  // vise
+  w.add(S.box([4, 16, 3], [8, 19, 7]), PAL.steel, M.metal);
+  const body = setGlow(mesh(w), glowMat(0xffe8b0, 1.6));
+  g.add(body);
+  const hit = hitBox(2.8, 2, 1.2); g.add(hit);
   return {
-    id: 'workbench', label: 'Workbench', group: g, pick: [body], rect: [4.4, 0.9, 7.2, 2.1], anchor: new THREE.Vector3(5.8, 1, 1.5),
+    id: 'workbench', label: 'Workbench', group: g, pick: [hit, body], rect: [4.4, 0.9, 7.2, 2.1], anchor: new THREE.Vector3(5.8, 1.2, 1.5),
     spots: [
       { id: 'wb0', station: 'workbench', pos: new THREE.Vector3(5.0, 0, 0.45), face: 0, anim: 'hammer' },
       { id: 'wb1', station: 'workbench', pos: new THREE.Vector3(6.7, 0, 0.45), face: 0, anim: 'whack' },
     ],
-    zap() { fx.sparks(new THREE.Vector3(6.85, 1.2, 1.5), 12); },
+    zap() { fx.sparks(new THREE.Vector3(6.75, 1.3, 1.45), 14); },
   };
 }
 
 export function buildStations(fx: Particles) {
-  const vat = cloningVat(fx);
-  const bench = workbench(fx);
-  const list: Station[] = [computerBank(fx), ideaDesk(), fuelTank(fx), vending(), wardrobe(), cabinet(), research(), vat, whiteboard(), bench];
-  return { list, vat, bench, byId: new Map(list.map((s) => [s.id, s])), faceToward };
+  const vat = cloningVat(fx), bench = workbench(fx), tank = fuelTank(fx);
+  const list: Station[] = [computer(), ideaDesk(), tank, vending(), wardrobe(), cabinet(), research(), vat, whiteboard(), bench];
+  return { list, vat, bench, tank, byId: new Map(list.map((s) => [s.id, s])), faceToward };
 }
+void vgrad; void economy;

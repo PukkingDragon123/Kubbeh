@@ -1,25 +1,31 @@
-import { useState } from 'preact/hooks';
-import { accounts, activeAccount, crew, economy, fuel, openPanelId, patchSettings, setPanel, settings, switchAccount } from '../../core/state';
+// Top HUD: neon logo, a slim crew plaque, and a row of small floating voxel objects —
+// gene capsule (with its count on a brass plaque), account ID card, edit-HQ wrench,
+// pop-out widget, speaker, settings gear. Numbers live only on plaques.
+import { useRef, useState } from 'preact/hooks';
+import { accounts, activeAccount, crew, economy, editMode, openPanelId, patchSettings, setPanel, settings, switchAccount } from '../../core/state';
 import { isBusy } from '../../core/crew';
 import { sfx } from '../../core/bus';
-import { fmtUsd, fmtTokens } from '../../core/util';
 import { Icon } from '../common/icons';
 import { Btn } from '../common/kit';
 import { actions } from '../actions';
+import { useStageObject } from './stage';
+import { geneCapsule, idCard } from '../../vox/ui/hudmodels';
+import { buildIcon } from '../../vox/ui/icons';
+import type { StageItem } from '../../vox/ui/stage';
 
-function FuelMini() {
-  const f = fuel.value;
-  const pct = Math.round(f.level * 100);
-  const color = f.tier === 'full' ? 'var(--glob)' : f.tier === 'half' ? 'var(--cyan)' : f.tier === 'quarter' ? 'var(--amber)' : 'var(--red)';
-  const blink = f.tier === 'critical' || f.tier === 'empty';
+function Obj({ label, icon, build, onClick, pressed, wide, children, deps = [], spin }: {
+  label: string; icon?: string; build?: () => import('three').Object3D; onClick: () => void; pressed?: boolean; wide?: boolean;
+  children?: preact.ComponentChildren; deps?: unknown[]; spin?: number;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const it = useRef<StageItem | null>(null);
+  useStageObject(ref, () => ({ obj: build ? build() : buildIcon(icon!), opts: { fit: 1.12, yaw: -0.4, pitch: 0.2, bob: 1.5, spin }, onItem: (i) => (it.current = i) }), [icon, ...deps]);
   return (
-    <button type="button" class="btn ghost sm pe" style={{ gap: '8px', paddingRight: '10px' }} title={`Fuel ${pct}% — ${f.source}`} onClick={() => setPanel(openPanelId.value === 'fuel' ? null : 'fuel')}>
-      <span style={{ color }}><Icon name="fuel" size="sm" /></span>
-      <span style={{ position: 'relative', width: '76px', height: '12px', borderRadius: '6px', background: '#050a07', boxShadow: 'inset 0 2px 4px #000c', overflow: 'hidden' }}>
-        <i style={{ position: 'absolute', inset: '0 auto 0 0', width: `${pct}%`, background: color, boxShadow: `0 0 10px ${color}`, transition: 'width .6s', animation: blink ? 'blink-warn .8s steps(1) infinite' : undefined }} />
-        {[50, 25, 10].map((m) => <b key={m} style={{ position: 'absolute', left: `${m}%`, top: 0, bottom: 0, width: '1px', background: '#ffffff55' }} />)}
-      </span>
-      <span class="tnum px" style={{ color, fontSize: '12px', minWidth: '34px', textAlign: 'right' }}>{pct}%</span>
+    <button ref={ref} type="button" class={`hud-obj pe ${wide ? 'wide' : ''}`} aria-label={label} aria-pressed={pressed}
+      onMouseEnter={() => sfx('hover', 0.15)}
+      onClick={() => { sfx('click', 0.5); if (it.current) it.current.sqV += 8; onClick(); }}>
+      <span class="tip plaque steel">{label}</span>
+      {children}
     </button>
   );
 }
@@ -27,25 +33,20 @@ function FuelMini() {
 function Genes() {
   const e = economy.value;
   return (
-    <button type="button" class="btn ghost sm pe" title={`${e.balance} Gene Points — spend them in the Shop`} onClick={() => setPanel(openPanelId.value === 'shop' ? null : 'shop')}>
-      <span class="glow-g"><Icon name="dna" size="sm" /></span>
-      <span class="tnum px glow-g" style={{ fontSize: '13px' }}>{e.balance.toLocaleString()}</span>
-    </button>
+    <Obj label={`${e.balance.toLocaleString()} Gene Points · Shop`} build={geneCapsule} onClick={() => setPanel(openPanelId.value === 'shop' ? null : 'shop')}>
+      <span class="hud-num plaque glow tnum">{e.balance.toLocaleString()}</span>
+    </Obj>
   );
 }
 
-function AccountSwitch() {
+function Account() {
   const [open, setOpen] = useState(false);
   const a = activeAccount.value;
   return (
-    <div class="pe" style={{ position: 'relative' }}>
-      <button type="button" class="btn ghost sm" onClick={() => { sfx('click', .5); setOpen(!open); }} title="Switch Claude account">
-        <span class="dot" style={{ color: a?.color ?? 'var(--text-3)' }} />
-        <span class="ellipsis hide-sm" style={{ maxWidth: '120px' }}>{a?.name ?? 'No account'}</span>
-        <Icon name="user" size="sm" />
-      </button>
+    <div class="pe" style={{ position: 'relative' }} onMouseLeave={() => setOpen(false)}>
+      <Obj label={a ? `${a.name} · switch account` : 'Link a Claude account'} wide build={() => idCard(a?.color ?? '#6f8596')} deps={[a?.color]} onClick={() => setOpen(!open)} />
       {open && (
-        <div class="card col gap-4" style={{ position: 'absolute', top: '40px', right: 0, width: '250px', zIndex: 30, animation: 'pop-in .25s var(--ease-jelly)' }} onMouseLeave={() => setOpen(false)}>
+        <div class="card col gap-4 acct-menu">
           <div class="up dim" style={{ padding: '2px 6px' }}>Claude accounts</div>
           {accounts.value.map((acc) => (
             <button type="button" class="li" key={acc.id} aria-current={acc.id === a?.id} onClick={() => { sfx('select', .5); void switchAccount(acc.id); setOpen(false); }}>
@@ -55,41 +56,44 @@ function AccountSwitch() {
             </button>
           ))}
           <div class="divider" />
-          <Btn size="sm" tone="ghost" icon="plus" onClick={() => { setOpen(false); setPanel('accounts'); }}>Link / manage accounts</Btn>
+          <Btn size="sm" tone="ghost" icon="plus" onClick={() => { setOpen(false); setPanel('accounts'); }}>Link / manage</Btn>
         </div>
       )}
     </div>
   );
 }
 
-function CrewTicker() {
+function CrewPlaque() {
   const busy = crew.value.filter(isBusy);
-  if (!busy.length) return <div class="dim hide-sm" style={{ fontSize: '12px' }}>Crew idle · {crew.value.length} aliens on shift</div>;
   const m = busy[busy.length - 1];
   return (
-    <div class="row hide-sm" style={{ fontSize: '12px', minWidth: 0 }} title={busy.map((b) => `${b.name}: ${b.label}`).join('\n')}>
-      <span class="dot pulse" style={{ color: 'var(--glob)' }} />
-      <span class="ellipsis"><b class="glow-g">{m.name}</b> <span class="dim">{m.label}</span></span>
-      {busy.length > 1 && <span class="chip g" style={{ height: '20px' }}>+{busy.length - 1}</span>}
+    <div class="crew-plaque hide-sm" title={busy.map((b) => `${b.name}: ${b.label}`).join('\n') || 'Crew idle'}>
+      <Icon name="alien" size="lg" />
+      {m ? (
+        <span class="ellipsis"><b class="glow-g" style={{ fontWeight: 400 }}>{m.name}</b> <span class="dim">{m.label}</span>{busy.length > 1 && <span class="chip g" style={{ height: '20px', marginLeft: '6px' }}>+{busy.length - 1}</span>}</span>
+      ) : <span class="dim">{crew.value.length} aliens on shift</span>}
     </div>
   );
 }
 
 export function Hud() {
   const s = settings.value;
-  const f = fuel.value;
   return (
     <header class="hud">
-      <div class="logo pe" role="button" tabIndex={0} onClick={() => { sfx('boing', .6); setPanel(null); }} title="Back to the lab">
-        <Icon name="alien" size="lg" /> GLOB<b>LABS</b>
+      <div class="logo pe" role="button" tabIndex={0} onClick={() => { sfx('boing', .6); setPanel(null); }} onKeyDown={(e) => { if (e.key === 'Enter') setPanel(null); }} title="Back to the lab">
+        GLOB<b>LABS</b>
       </div>
-      <div class="grow row" style={{ justifyContent: 'center', minWidth: 0 }}><CrewTicker /></div>
-      <span class="dim tnum hide-sm" style={{ fontSize: '11px' }} title={f.source}>{f.budget.mode === 'usd' ? fmtUsd(f.spentUsd) : fmtTokens(f.spentTokens) + ' tok'}{f.estimated ? ' est.' : ''}</span>
-      <FuelMini />
-      <Genes />
-      <AccountSwitch />
-      <Btn class="pe hide-sm" size="sm" tone="ghost" iconOnly icon="widget" title="Pop out the floating lab widget" onClick={() => void actions.openWidget()} />
-      <Btn class="pe" size="sm" tone="ghost" iconOnly icon={s.muted ? 'mute' : 'sound'} title={s.muted ? 'Unmute' : 'Mute'} onClick={() => patchSettings({ muted: !s.muted })} />
+      <div class="grow row" style={{ justifyContent: 'center', minWidth: 0 }}><CrewPlaque /></div>
+      <div class="hud-top">
+        <Genes />
+        <Account />
+        <Obj label={editMode.value ? 'Done editing (E)' : 'Rearrange HQ (E)'} icon="wrench" pressed={editMode.value} onClick={() => { editMode.value = !editMode.value; if (editMode.value) setPanel(null); }} />
+        <span class="hide-sm" style={{ display: 'contents' }}>
+          <Obj label="Pop-out lab widget" icon="widget" onClick={() => void actions.openWidget()} />
+        </span>
+        <Obj label={s.muted ? 'Unmute' : 'Mute'} icon={s.muted ? 'mute' : 'sound'} onClick={() => patchSettings({ muted: !s.muted })} />
+        <Obj label="Settings (,)" icon="gear" onClick={() => setPanel(openPanelId.value === 'settings' ? null : 'settings')} />
+      </div>
     </header>
   );
 }

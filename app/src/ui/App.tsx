@@ -1,9 +1,14 @@
 import { useEffect } from 'preact/hooks';
-import { openPanelId, panelArg, setPanel, settings } from '../core/state';
+import { editMode, openPanelId, panelArg, setPanel, settings } from '../core/state';
 import { bus, sfx } from '../core/bus';
 import { panels } from './panels';
 import { Hud } from './hud/Hud';
-import { Dock } from './hud/Dock';
+import { HudDock } from './hud/HudDock';
+import { stageSig } from './hud/stage';
+import { mountHudStage } from '../vox/ui/stage';
+import { installChrome } from './common/chrome';
+import { warmIcons } from './common/icons';
+import { useRef } from 'preact/hooks';
 import { Toasts, GenePops } from './common/Toasts';
 import { QuestionBubble } from './common/QuestionBubble';
 import { ModalHost } from './common/kit';
@@ -21,6 +26,19 @@ function PanelHost() {
   );
 }
 
+function HudStageCanvas() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    try { installChrome(); } catch (err) { console.warn('[chrome]', err); }
+    const st = mountHudStage(ref.current);
+    stageSig.value = st;
+    warmIcons();
+  }, []);
+  useEffect(() => { const st = stageSig.value; if (st) st.reduceMotion = settings.value.reduceMotion; }, [settings.value.reduceMotion, stageSig.value]);
+  return <canvas ref={ref} class="hud3d" aria-hidden="true" />;
+}
+
 export function App() {
   useEffect(() => {
     const offOpen = bus.on('ui:open', ({ panel, arg }) => { sfx('panel_open', .45); setPanel(panel, arg); });
@@ -33,6 +51,7 @@ export function App() {
       }
       if (e.key === 'Escape') { if (openPanelId.value) { sfx('panel_close', .4); setPanel(null); } return; }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'e' || e.key === 'E') { sfx('toggle', .5); editMode.value = !editMode.value; if (editMode.value) setPanel(null); return; }
       for (const p of panels.values()) if (p.dock?.hotkey && p.dock.hotkey.toLowerCase() === e.key.toLowerCase()) {
         e.preventDefault(); sfx('panel_open', .45); setPanel(openPanelId.value === p.id ? null : p.id); return;
       }
@@ -43,9 +62,10 @@ export function App() {
   useEffect(() => { document.documentElement.classList.toggle('reduce-motion', settings.value.reduceMotion); }, [settings.value.reduceMotion]);
   return (
     <>
+      <HudStageCanvas />
       <Hud />
       <PanelHost />
-      <Dock />
+      <HudDock />
       <QuestionBubble />
       <Toasts />
       <GenePops />

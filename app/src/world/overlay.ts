@@ -1,20 +1,20 @@
-// World-owned DOM overlay: crisp pixel-font name tags over busy aliens, the hover label,
-// and the Edit HQ toolbar with your unplaced inventory.
+// World-owned DOM overlay: small plaques over busy / hovered aliens (in the user's own fonts),
+// the hover label, and the Edit HQ toolbar with your unplaced inventory.
 import { economy, editMode, placingItem, unplacedCount } from '../core/state';
 import { CATALOG } from '../economy/catalog';
 import { bus } from '../core/bus';
 
 const CSS = `
-.gl-ov{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;font-family:'Pixelify Sans',ui-monospace,monospace}
-.gl-tag{position:absolute;left:0;top:0;transform:translate(-50%,-100%);white-space:nowrap;padding:3px 8px 4px;border-radius:9px;
-  background:#0b100de6;color:#e8ffe6;font-size:11px;letter-spacing:.05em;box-shadow:0 0 0 1.5px #8cf56b66,0 4px 12px #000a;transition:opacity .25s;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.gl-ov{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;font-family:var(--font-display),ui-monospace,monospace}
+.gl-tag{position:absolute;left:0;top:0;transform:translate(-50%,-100%);white-space:nowrap;padding:3px 8px 4px;border-radius:6px;
+  background:linear-gradient(#1c262ce6,#0b100de6);color:#e8ffe6;font-size:11px;letter-spacing:.05em;box-shadow:inset 0 1px 0 #ffffff22,0 0 0 1.5px #52f2ff55,0 4px 12px #000a;transition:opacity .25s;max-width:240px;overflow:hidden;text-overflow:ellipsis}
 .gl-tag b{color:#8cf56b;font-weight:600;margin-right:5px}
 .gl-tag.idle{opacity:0}
 .gl-tag.show{opacity:1}
 .gl-hover{position:absolute;left:0;top:0;transform:translate(14px,14px);padding:5px 10px;border-radius:10px;background:#fbfff3;color:#142016;font-size:12px;
   letter-spacing:.04em;box-shadow:0 0 0 2.5px #142016,0 6px 0 #14201655;white-space:nowrap;opacity:0;transition:opacity .12s}
 .gl-hover.on{opacity:1}
-.gl-hover small{display:block;font-family:'Rubik',system-ui,sans-serif;font-size:10.5px;color:#4a6a50;letter-spacing:0}
+.gl-hover small{display:block;font-family:var(--font-body),system-ui,sans-serif;font-size:11px;color:#4a6a50;letter-spacing:0}
 .gl-edit{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:5;pointer-events:auto;display:none;flex-direction:column;gap:8px;align-items:center;
   max-width:calc(100vw - 24px)}
 .gl-edit.on{display:flex}
@@ -24,7 +24,7 @@ const CSS = `
 .gl-edit button{font-family:inherit;font-size:12px;border:0;border-radius:10px;padding:6px 10px;cursor:pointer;background:#2b3631;color:#e8ffe6;box-shadow:inset 0 1px 0 #ffffff30,0 3px 0 #1a211d}
 .gl-edit button[aria-pressed=true]{background:#8cf56b;color:#062a08}
 .gl-edit button.done{background:#8cf56b;color:#062a08}
-.gl-edit .hint{font-family:'Rubik',system-ui,sans-serif;font-size:11px;color:#a9c9af;padding:3px 9px;background:#0b100dd9;border-radius:8px}
+.gl-edit .hint{font-family:var(--font-body),system-ui,sans-serif;font-size:11px;color:#a9c9af;padding:3px 9px;background:#0b100dd9;border-radius:8px}
 `;
 
 export class Overlay {

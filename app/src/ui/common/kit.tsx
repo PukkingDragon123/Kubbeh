@@ -3,7 +3,7 @@ import type { ComponentChildren } from 'preact';
 import type { CSSProperties } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { signal } from '@preact/signals';
-import { Icon, type IconName } from './icons';
+import { Icon, iconURL, type IconName } from './icons';
 import { sfx } from '../../core/bus';
 
 type Tone = 'glob' | 'pink' | 'cyan' | 'amber' | 'danger' | 'ghost' | '';
@@ -27,18 +27,25 @@ export function Btn(props: {
   );
 }
 
-/** Riveted metal window with hazard stripe title bar. */
+/** Hull-steel housing: bevelled frame, voxel corner brackets, hazard channel, voxel close button. */
 export function Win(props: {
   title: ComponentChildren; icon?: IconName; onClose?: () => void; children: ComponentChildren;
   actions?: ComponentChildren; class?: string; style?: CSSProperties; bodyClass?: string;
 }) {
   return (
     <section class={`win ${props.class ?? ''}`} style={props.style} role="dialog" aria-label={typeof props.title === 'string' ? props.title : undefined}>
+      <i class="win-corner tl" aria-hidden="true" /><i class="win-corner tr" aria-hidden="true" />
+      <i class="win-corner bl" aria-hidden="true" /><i class="win-corner br" aria-hidden="true" />
       <header class="win-bar">
-        <h2 class="win-title">{props.icon && <Icon name={props.icon} />}<span class="ellipsis">{props.title}</span></h2>
+        <h2 class="win-title">{props.icon && <Icon name={props.icon} size="lg" />}<span class="ellipsis">{props.title}</span></h2>
         <div class="win-hazard" aria-hidden="true" />
         {props.actions}
-        {props.onClose && <Btn tone="danger" size="sm" iconOnly round icon="close" title="Close" onClick={props.onClose} />}
+        {props.onClose && (
+          <button type="button" class="win-close" title="Close (Esc)" aria-label="Close"
+            onMouseEnter={() => sfx('hover', 0.12)} onClick={() => { sfx('click', 0.5); props.onClose!(); }}>
+            <Icon name="close" size="xl" />
+          </button>
+        )}
       </header>
       <div class={`win-body ${props.bodyClass ?? ''}`}>{props.children}</div>
     </section>
@@ -91,9 +98,10 @@ export function Meter({ value, tone }: { value: number; tone?: 'warn' | 'crit' }
 }
 
 export function Empty({ icon = 'alien', title, children }: { icon?: IconName; title: string; children?: ComponentChildren }) {
+  const url = iconURL(icon, 96);
   return (
     <div class="empty">
-      <Icon name={icon} size="xl" class="glow-g" />
+      {url ? <img class="ico vx" src={url} width={96} height={96} alt="" aria-hidden="true" draggable={false} /> : <Icon name={icon} size="xl" />}
       <h3>{title}</h3>
       {children}
     </div>

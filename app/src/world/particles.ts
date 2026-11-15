@@ -1,16 +1,19 @@
-// Pooled pixel-art particles: one Points draw call per blend mode, tiles from the atlas.
+// Pooled VOXEL particles: every spark, bubble, steam puff, heart, Zzz, "?" and "!" is a tiny
+// 3D voxel model (cube, cross, or an extruded voxel glyph) drawn with InstancedMesh — one
+// draw call per shape and blend mode. Same emit() API the crew / stations already use.
 import * as THREE from 'three';
-import { particleAtlas, TILE, type TileName } from './pixels';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+export type TileName =
+  | 'spark' | 'dust' | 'sparkle' | 'star' | 'steam' | 'smoke' | 'puff' | 'drop' | 'bubble' | 'glob' | 'coin' | 'bolt' | 'bug'
+  | 'ring' | 'question' | 'bang' | 'zzz' | 'heart' | 'note' | 'code1' | 'code2' | 'code3' | 'code4' | 'eye' | 'file';
 
 export interface EmitOpts {
   tile: TileName | TileName[];
   pos: THREE.Vector3 | [number, number, number];
   count?: number;
-  /** base velocity */
   vel?: [number, number, number];
-  /** random velocity spread per axis */
   spread?: [number, number, number];
-  /** random position jitter */
   jitter?: number;
   life?: number | [number, number];
   size?: number | [number, number];
@@ -18,147 +21,176 @@ export interface EmitOpts {
   gravity?: number;
   drag?: number;
   additive?: boolean;
-  /** end size multiplier */
   grow?: number;
-  /** spin flag: wobble horizontally */
   wobble?: number;
 }
 
-const VERT = /* glsl */ `
-  attribute float aSize; attribute float aTile; attribute vec4 aColor;
-  varying float vTile; varying vec4 vColor;
-  uniform float uScale;
-  void main() {
-    vTile = aTile; vColor = aColor;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * uScale / max(0.1, -mv.z);
-    gl_Position = projectionMatrix * mv;
-  }`;
-const FRAG = /* glsl */ `
-  uniform sampler2D uAtlas; varying float vTile; varying vec4 vColor;
-  void main() {
-    float t = floor(vTile + 0.5);
-    vec2 tile = vec2(mod(t, 8.0), floor(t / 8.0));
-    vec2 uv = (tile * 16.0 + gl_PointCoord * 16.0) / vec2(128.0, 64.0);
-    vec4 tex = texture2D(uAtlas, uv);
-    if (tex.a * vColor.a < 0.06) discard;
-    gl_FragColor = vec4(vColor.rgb, tex.a * vColor.a);
-  }`;
+// ── shapes ───────────────────────────────────────────────────────────────────
+const BIT: Record<string, string[]> = {
+  question: ['01110', '10001', '00010', '00100', '00000', '00100'],
+  bang: ['1', '1', '1', '1', '0', '1'],
+  zzz: ['11111', '00010', '00100', '01000', '11111'],
+  heart: ['01010', '11111', '11111', '01110', '00100'],
+  note: ['00111', '00101', '00100', '01100', '11100', '11000'],
+  code1: ['00010', '00100', '01000', '00100', '00010'],   // <
+  code2: ['01000', '00100', '00010', '00100', '01000'],   // >
+  code3: ['00001', '00010', '00100', '01000', '10000'],   // /
+  code4: ['00110', '00100', '01100', '00100', '00110'],   // {
+  file: ['11100', '10110', '10011', '10001', '10001', '11111'],
+  eye: ['01110', '10101', '11111', '10101', '01110'],
+  bug: ['10001', '01110', '11111', '01110', '10101'],
+  ring: ['11111', '10001', '10001', '10001', '11111'],
+};
+function glyphGeo(rows: string[]) {
+  const boxes: THREE.BufferGeometry[] = [];
+  const h = rows.length, w = rows[0].length, s = 1 / Math.max(w, h);
+  rows.forEach((r, y) => [...r].forEach((ch, x) => {
+    if (ch !== '1') return;
+    const b = new THREE.BoxGeometry(s * 0.96, s * 0.96, s * 0.9);
+    b.translate((x - (w - 1) / 2) * s, ((h - 1) / 2 - y) * s, 0);
+    boxes.push(b);
+  }));
+  return mergeGeometries(boxes)!;
+}
+function crossGeo() {
+  const a = new THREE.BoxGeometry(1, 0.34, 0.34), b = new THREE.BoxGeometry(0.34, 1, 0.34), c = new THREE.BoxGeometry(0.34, 0.34, 1);
+  return mergeGeometries([a, b, c])!;
+}
+const CUBE = new THREE.BoxGeometry(1, 1, 1);
 
-class Pool {
-  readonly max: number;
-  pos: Float32Array; vel: Float32Array; size: Float32Array; size0: Float32Array; size1: Float32Array; tile: Float32Array; color: Float32Array;
-  life: Float32Array; age: Float32Array; grav: Float32Array; drag: Float32Array; wob: Float32Array; alpha0: Float32Array;
+type ShapeKey = 'cube' | 'cross' | keyof typeof BIT;
+const SHAPE_OF: Record<TileName, ShapeKey> = {
+  spark: 'cube', dust: 'cube', sparkle: 'cross', star: 'cross', steam: 'cube', smoke: 'cube', puff: 'cube', drop: 'cube',
+  bubble: 'cube', glob: 'cube', coin: 'cube', bolt: 'cross', bug: 'bug', ring: 'ring', question: 'question', bang: 'bang',
+  zzz: 'zzz', heart: 'heart', note: 'note', code1: 'code1', code2: 'code2', code3: 'code3', code4: 'code4', eye: 'eye', file: 'file',
+};
+const GLYPH = new Set<ShapeKey>(['question', 'bang', 'zzz', 'heart', 'note', 'code1', 'code2', 'code3', 'code4', 'file', 'eye', 'bug', 'ring']);
+const SOFT = new Set<TileName>(['steam', 'smoke', 'puff']);
+
+type Blend = 'add' | 'solid' | 'soft';
+const MAX_PER = 600;
+
+class Batch {
+  mesh: THREE.InstancedMesh;
   n = 0;
-  geo = new THREE.BufferGeometry();
-  points: THREE.Points;
-  mat: THREE.ShaderMaterial;
-  constructor(max: number, additive: boolean) {
-    this.max = max;
-    this.pos = new Float32Array(max * 3); this.vel = new Float32Array(max * 3); this.size = new Float32Array(max);
-    this.size0 = new Float32Array(max); this.size1 = new Float32Array(max); this.tile = new Float32Array(max);
-    this.color = new Float32Array(max * 4); this.life = new Float32Array(max); this.age = new Float32Array(max);
-    this.grav = new Float32Array(max); this.drag = new Float32Array(max); this.wob = new Float32Array(max); this.alpha0 = new Float32Array(max);
-    this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
-    this.geo.setAttribute('aSize', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage));
-    this.geo.setAttribute('aTile', new THREE.BufferAttribute(this.tile, 1).setUsage(THREE.DynamicDrawUsage));
-    this.geo.setAttribute('aColor', new THREE.BufferAttribute(this.color, 4).setUsage(THREE.DynamicDrawUsage));
-    this.geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
-    this.mat = new THREE.ShaderMaterial({
-      vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
-      uniforms: { uAtlas: { value: particleAtlas() }, uScale: { value: 500 } },
-      toneMapped: false,
-    });
-    this.points = new THREE.Points(this.geo, this.mat);
-    this.points.frustumCulled = false;
-    this.points.renderOrder = additive ? 20 : 19;
-  }
-  spawn(): number {
-    if (this.n >= this.max) return -1;
-    return this.n++;
-  }
-  kill(i: number) {
-    const j = --this.n;
-    if (i === j) return;
-    const c3 = (a: Float32Array) => { a[i * 3] = a[j * 3]; a[i * 3 + 1] = a[j * 3 + 1]; a[i * 3 + 2] = a[j * 3 + 2]; };
-    c3(this.pos); c3(this.vel);
-    for (let k = 0; k < 4; k++) this.color[i * 4 + k] = this.color[j * 4 + k];
-    for (const a of [this.size, this.size0, this.size1, this.tile, this.life, this.age, this.grav, this.drag, this.wob, this.alpha0]) a[i] = a[j];
-  }
-  update(dt: number, t: number) {
-    for (let i = 0; i < this.n; i++) {
-      this.age[i] += dt;
-      if (this.age[i] >= this.life[i]) { this.kill(i); i--; continue; }
-      const k = this.age[i] / this.life[i];
-      const d = Math.max(0, 1 - this.drag[i] * dt);
-      this.vel[i * 3] *= d; this.vel[i * 3 + 2] *= d;
-      this.vel[i * 3 + 1] = this.vel[i * 3 + 1] * d - this.grav[i] * dt;
-      const w = this.wob[i] ? Math.sin(t * 6 + i) * this.wob[i] * dt : 0;
-      this.pos[i * 3] += this.vel[i * 3] * dt + w;
-      this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt;
-      this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt;
-      this.size[i] = this.size0[i] + (this.size1[i] - this.size0[i]) * k;
-      const fade = k < 0.12 ? k / 0.12 : k > 0.65 ? 1 - (k - 0.65) / 0.35 : 1;
-      this.color[i * 4 + 3] = this.alpha0[i] * fade;
-    }
-    this.geo.setDrawRange(0, this.n);
-    for (const name of ['position', 'aSize', 'aTile', 'aColor']) (this.geo.attributes[name] as THREE.BufferAttribute).needsUpdate = true;
+  constructor(geo: THREE.BufferGeometry, public blend: Blend) {
+    const mat = blend === 'add'
+      ? new THREE.MeshBasicMaterial({ color: 0xffffff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false })
+      : blend === 'soft'
+        ? new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.32, depthWrite: false, roughness: 1 })
+        : new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0.05 });
+    this.mesh = new THREE.InstancedMesh(geo, mat, MAX_PER);
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PER * 3), 3);
+    this.mesh.count = 0;
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = blend === 'solid' ? 0 : 3;
   }
 }
 
-const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+interface P {
+  x: number; y: number; z: number; vx: number; vy: number; vz: number;
+  age: number; life: number; s0: number; s1: number; grav: number; drag: number; wob: number;
+  r: number; g: number; b: number; batch: Batch; spin: number; rot: number; glyph: boolean;
+}
+
 const tmpC = new THREE.Color();
+const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+const pickN = (v: number | [number, number]) => (Array.isArray(v) ? rnd(v[0], v[1]) : v);
 
 export class Particles {
   readonly group = new THREE.Group();
-  private add = new Pool(1600, true);
-  private norm = new Pool(1600, false);
   enabled = true;
-  scale = 1; // global density (quality)
-  constructor() { this.group.add(this.add.points, this.norm.points); }
+  scale = 1;
+  private batches = new Map<string, Batch>();
+  private live: P[] = [];
+  private camQ = new THREE.Quaternion();
+  private geos = new Map<ShapeKey, THREE.BufferGeometry>();
 
-  setViewport(heightPx: number, fovDeg: number) {
-    const s = heightPx / (2 * Math.tan((fovDeg * Math.PI) / 360));
-    this.add.mat.uniforms.uScale.value = s; this.norm.mat.uniforms.uScale.value = s;
+  setViewport(_h: number, _fov: number) {}
+  setCamera(cam: THREE.Camera) { this.camQ.copy(cam.quaternion); }
+
+  private geo(k: ShapeKey) {
+    let g = this.geos.get(k);
+    if (!g) { g = k === 'cube' ? CUBE : k === 'cross' ? crossGeo() : glyphGeo(BIT[k]); this.geos.set(k, g); }
+    return g;
+  }
+  private batch(shape: ShapeKey, blend: Blend) {
+    const key = shape + ':' + blend;
+    let b = this.batches.get(key);
+    if (!b) { b = new Batch(this.geo(shape), blend); this.batches.set(key, b); this.group.add(b.mesh); }
+    return b;
   }
 
   emit(o: EmitOpts) {
     if (!this.enabled) return;
-    const pool = o.additive ? this.add : this.norm;
-    const count = Math.max(1, Math.round((o.count ?? 1) * (o.count && o.count > 1 ? this.scale : 1)));
-    const p = Array.isArray(o.pos) ? o.pos : [o.pos.x, o.pos.y, o.pos.z];
+    const n = Math.max(1, Math.round((o.count ?? 1) * this.scale));
     const tiles = Array.isArray(o.tile) ? o.tile : [o.tile];
-    const colors = Array.isArray(o.color) ? o.color : [o.color ?? '#ffffff'];
-    for (let c = 0; c < count; c++) {
-      const i = pool.spawn(); if (i < 0) return;
-      const j = o.jitter ?? 0;
-      pool.pos[i * 3] = p[0] + rnd(-j, j); pool.pos[i * 3 + 1] = p[1] + rnd(-j, j) * 0.5; pool.pos[i * 3 + 2] = p[2] + rnd(-j, j);
-      const v = o.vel ?? [0, 0, 0], s = o.spread ?? [0, 0, 0];
-      pool.vel[i * 3] = v[0] + rnd(-s[0], s[0]); pool.vel[i * 3 + 1] = v[1] + rnd(-s[1], s[1]); pool.vel[i * 3 + 2] = v[2] + rnd(-s[2], s[2]);
-      const life = Array.isArray(o.life) ? rnd(o.life[0], o.life[1]) : o.life ?? 1;
-      const size = Array.isArray(o.size) ? rnd(o.size[0], o.size[1]) : o.size ?? 0.25;
-      pool.life[i] = life; pool.age[i] = 0;
-      pool.size0[i] = size; pool.size1[i] = size * (o.grow ?? 1); pool.size[i] = size;
-      pool.tile[i] = TILE[tiles[Math.floor(Math.random() * tiles.length)]];
-      tmpC.set(colors[Math.floor(Math.random() * colors.length)] as THREE.ColorRepresentation);
-      if (o.additive) tmpC.multiplyScalar(1.6);
-      pool.color[i * 4] = tmpC.r; pool.color[i * 4 + 1] = tmpC.g; pool.color[i * 4 + 2] = tmpC.b; pool.color[i * 4 + 3] = 0;
-      pool.alpha0[i] = 1;
-      pool.grav[i] = o.gravity ?? 0; pool.drag[i] = o.drag ?? 0; pool.wob[i] = o.wobble ?? 0;
+    const cols = Array.isArray(o.color) ? o.color : [o.color ?? '#ffffff'];
+    const p = Array.isArray(o.pos) ? o.pos : [o.pos.x, o.pos.y, o.pos.z];
+    for (let i = 0; i < n; i++) {
+      if (this.live.length > 1400) this.live.shift();
+      const tile = tiles[(Math.random() * tiles.length) | 0];
+      const shape = SHAPE_OF[tile] ?? 'cube';
+      const blend: Blend = SOFT.has(tile) && !o.additive ? 'soft' : o.additive ? 'add' : 'solid';
+      tmpC.set(cols[(Math.random() * cols.length) | 0] as any);
+      const sp = o.spread ?? [0, 0, 0], v = o.vel ?? [0, 0, 0], j = o.jitter ?? 0;
+      const size = pickN(o.size ?? 0.1) * (GLYPH.has(shape) ? 1.6 : 0.75);
+      this.live.push({
+        x: p[0] + (Math.random() - 0.5) * j, y: p[1] + (Math.random() - 0.5) * j, z: p[2] + (Math.random() - 0.5) * j,
+        vx: v[0] + (Math.random() - 0.5) * sp[0], vy: v[1] + (Math.random() - 0.5) * sp[1], vz: v[2] + (Math.random() - 0.5) * sp[2],
+        age: 0, life: Math.max(0.05, pickN(o.life ?? 1)), s0: size, s1: size * (o.grow ?? (blend === 'soft' ? 2.2 : 0.4)),
+        grav: o.gravity ?? 0, drag: o.drag ?? 0, wob: o.wobble ?? 0, r: tmpC.r, g: tmpC.g, b: tmpC.b,
+        batch: this.batch(shape, blend), spin: GLYPH.has(shape) ? (Math.random() - 0.5) * 1.2 : (Math.random() - 0.5) * 8, rot: Math.random() * 6, glyph: GLYPH.has(shape),
+      });
     }
   }
 
-  update(dt: number, t: number) { this.add.update(dt, t); this.norm.update(dt, t); }
-
-  // ── presets ──
-  burst(pos: THREE.Vector3, colors: (string | number)[] = ['#ff6fd6', '#8cf56b', '#52f2ff', '#ffbe3d', '#b48cff'], n = 26) {
-    this.emit({ tile: ['confetti', 'square', 'star'], pos, count: n, vel: [0, 3.2, 0], spread: [2.2, 1.6, 2.2], gravity: 6, drag: 1.2, life: [0.9, 1.6], size: [0.12, 0.2], color: colors, wobble: 0.6 });
+  update(dt: number, t: number) {
+    for (const b of this.batches.values()) b.n = 0;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), pv = new THREE.Vector3();
+    const alive: P[] = [];
+    for (const p of this.live) {
+      p.age += dt;
+      if (p.age >= p.life) continue;
+      alive.push(p);
+      const k = p.age / p.life;
+      p.vy -= p.grav * dt;
+      const dr = Math.max(0, 1 - p.drag * dt);
+      p.vx *= dr; p.vy *= dr; p.vz *= dr;
+      p.x += p.vx * dt + (p.wob ? Math.sin(t * 4 + p.rot * 3) * p.wob * dt : 0);
+      p.y += p.vy * dt; p.z += p.vz * dt;
+      p.rot += p.spin * dt;
+      const b = p.batch;
+      if (b.n >= MAX_PER) continue;
+      // pop in, ease out
+      const pop = Math.min(1, p.age / 0.08);
+      let sz = (p.s0 + (p.s1 - p.s0) * k) * pop;
+      let fade = 1;
+      if (b.blend === 'add') fade = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1; else if (k > 0.7) sz *= 1 - (k - 0.7) / 0.3;
+      if (p.glyph) q.copy(this.camQ).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(p.rot) * 0.5));
+      else q.setFromEuler(e.set(p.rot, p.rot * 0.7, 0));
+      m.compose(pv.set(p.x, p.y, p.z), q, s.set(sz, sz, sz));
+      b.mesh.setMatrixAt(b.n, m);
+      b.mesh.instanceColor!.setXYZ(b.n, p.r * fade * (b.blend === 'add' ? 1.6 : 1), p.g * fade * (b.blend === 'add' ? 1.6 : 1), p.b * fade * (b.blend === 'add' ? 1.6 : 1));
+      b.n++;
+    }
+    this.live = alive;
+    for (const b of this.batches.values()) {
+      b.mesh.count = b.n;
+      b.mesh.instanceMatrix.needsUpdate = true;
+      if (b.mesh.instanceColor) b.mesh.instanceColor.needsUpdate = true;
+    }
   }
-  poof(pos: THREE.Vector3, color: string | number = '#c9ffd0', n = 14) {
-    this.emit({ tile: ['puff', 'smoke'], pos, count: n, vel: [0, 0.6, 0], spread: [1.4, 0.6, 1.4], drag: 2.5, life: [0.5, 0.9], size: [0.3, 0.5], grow: 1.8, color });
+
+  /** celebratory confetti burst */
+  burst(pos: THREE.Vector3, colors: (string | number)[] = ['#ff6fd6', '#8cf56b', '#52f2ff', '#ffbe3d', '#b48cff'], n = 30) {
+    this.emit({ tile: ['spark', 'sparkle', 'star'], pos, count: n, vel: [0, 2.6, 0], spread: [3, 2, 3], gravity: 5, drag: 0.6, life: [0.8, 1.5], size: [0.06, 0.11], color: colors });
+  }
+  poof(pos: THREE.Vector3, color: string | number = '#c9ffd0', n = 16) {
+    this.emit({ tile: ['puff', 'steam'], pos, count: n, vel: [0, 0.7, 0], spread: [1.8, 1, 1.8], drag: 1.6, life: [0.5, 0.9], size: [0.12, 0.2], grow: 2.4, color });
+    this.emit({ tile: 'sparkle', pos, count: Math.ceil(n / 2), vel: [0, 1.2, 0], spread: [2, 1, 2], life: 0.6, size: 0.08, color, additive: true });
   }
   sparks(pos: THREE.Vector3, n = 10) {
-    this.emit({ tile: ['spark', 'sparkle', 'plus'], pos, count: n, vel: [0, 2, 0], spread: [2.5, 1.5, 2.5], gravity: 7, life: [0.25, 0.5], size: [0.1, 0.18], color: ['#ffe27a', '#ffffff', '#52f2ff'], additive: true });
+    this.emit({ tile: ['spark', 'bolt'], pos, count: n, vel: [0, 2, 0], spread: [3, 2.4, 3], gravity: 7, life: [0.25, 0.55], size: [0.035, 0.07], color: ['#ffe27a', '#ffffff', '#52f2ff'], additive: true });
   }
 }

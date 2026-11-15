@@ -1,5 +1,7 @@
 // Fuel tank station: the big glass tank, where its numbers come from, and what Auto-Saver does.
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { FuelTank } from '../../vox/ui/tank';
+import { MiniView } from '../../vox/ui/miniview';
 import type { FuelBudget } from '../../core/types';
 import { activeAccount, fuel, patchSettings, rateLimit, settings, updateAccount, usageLog } from '../../core/state';
 import { sfx } from '../../core/bus';
@@ -9,54 +11,26 @@ import { Icon } from '../common/icons';
 import { modelInfo } from '../../claude/models';
 import { fetchOrgSpend, fullPolicy, orgSpend, periodStart, TIER_LABEL, TIER_RULES } from '../../claude/fuel';
 
+/** The big live 3D voxel tank (same machine as the HUD's FUEL button). Drag to turn it. */
 function Tank({ level, tier }: { level: number; tier: string }) {
-  const H = 300, W = 150, top = 30, bottom = 280;
-  const y = bottom - (bottom - top) * Math.max(0, Math.min(1, level));
-  const color = tier === 'full' ? '#8cf56b' : tier === 'half' ? '#52f2ff' : tier === 'quarter' ? '#ffbe3d' : '#ff5a5a';
-  const marks = [0.5, 0.25, 0.1];
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    let view: MiniView | null = null;
+    try {
+      const tank = new FuelTank();
+      view = new MiniView(ref.current, tank.root, (t, dt) => { const f = fuel.value; tank.update(dt, t, f.level, f.tier); }, { fill: 0.94, interactive: true });
+    } catch (err) { console.warn('[fuel] 3D tank unavailable', err); }
+    return () => view?.dispose();
+  }, []);
+  const pct = Math.round(level * 100);
+  const tone = tier === 'full' ? 'glow' : tier === 'half' ? 'steel' : tier === 'quarter' ? 'warn' : 'crit';
   return (
-    <svg viewBox={`0 0 ${W + 60} ${H + 34}`} class="fuel-tank" role="img" aria-label={`Fuel ${Math.round(level * 100)} percent`}>
-      <defs>
-        <linearGradient id="ft-glass" x1="0" x2="1"><stop offset="0" stop-color="#ffffff22" /><stop offset=".3" stop-color="#ffffff08" /><stop offset=".85" stop-color="#ffffff14" /><stop offset="1" stop-color="#ffffff05" /></linearGradient>
-        <linearGradient id="ft-liquid" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color={color} stop-opacity=".95" /><stop offset="1" stop-color={color} stop-opacity=".55" /></linearGradient>
-        <clipPath id="ft-clip"><rect x="20" y={top} width={W - 40} height={bottom - top} rx="26" /></clipPath>
-        <filter id="ft-glow"><feGaussianBlur stdDeviation="4" /></filter>
-      </defs>
-      {/* frame */}
-      <rect x="8" y="10" width={W - 16} height={H - 4} rx="34" fill="#1a211d" stroke="#435249" stroke-width="4" />
-      <rect x="20" y={top} width={W - 40} height={bottom - top} rx="26" fill="#050a07" />
-      <g clip-path="url(#ft-clip)">
-        <rect x="0" y={y} width={W} height={bottom - y + 10} fill="url(#ft-liquid)" style={{ transition: 'y .8s cubic-bezier(.22,1,.36,1)' }} />
-        <path fill={color} opacity=".55" d={`M0 ${y} q 15 -7 30 0 t 30 0 t 30 0 t 30 0 t 30 0 t 30 0 v 14 h -180 z`}>
-          <animateTransform attributeName="transform" type="translate" from="-60 0" to="0 0" dur="2.4s" repeatCount="indefinite" />
-        </path>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <circle key={i} r={2 + (i % 3)} cx={35 + i * 18} cy={bottom - 10} fill="#fff" opacity=".35">
-            <animate attributeName="cy" from={bottom - 6} to={y + 6} dur={`${2 + i * 0.6}s`} repeatCount="indefinite" />
-            <animate attributeName="opacity" values=".4;.25;0" dur={`${2 + i * 0.6}s`} repeatCount="indefinite" />
-          </circle>
-        ))}
-      </g>
-      <rect x="20" y={top} width={W - 40} height={bottom - top} rx="26" fill="url(#ft-glass)" />
-      {/* markers + lamps */}
-      {marks.map((m) => {
-        const my = bottom - (bottom - top) * m;
-        const hit = level <= m;
-        const lamp = m === 0.5 ? '#52f2ff' : m === 0.25 ? '#ffbe3d' : '#ff5a5a';
-        return (
-          <g key={m}>
-            <line x1="16" x2={W - 16} y1={my} y2={my} stroke="#ffffff55" stroke-dasharray="4 4" />
-            <text x={W - 2} y={my + 4} fill="#a9c9af" font-size="12" font-family="Pixelify Sans, monospace">{m * 100}%</text>
-            <circle cx={W + 44} cy={my} r="9" fill={hit ? lamp : '#26302a'} stroke="#0b100d" stroke-width="3">
-              {hit && <animate attributeName="opacity" values="1;.25;1" dur={m === 0.1 ? '.5s' : '1s'} repeatCount="indefinite" />}
-            </circle>
-            {hit && <circle cx={W + 44} cy={my} r="14" fill={lamp} opacity=".35" filter="url(#ft-glow)"><animate attributeName="opacity" values=".5;0;.5" dur={m === 0.1 ? '.5s' : '1s'} repeatCount="indefinite" /></circle>}
-          </g>
-        );
-      })}
-      <rect x={W / 2 - 22} y="2" width="44" height="14" rx="4" fill="#435249" />
-      <text x={W / 2} y={H + 28} text-anchor="middle" fill={color} font-size="22" font-family="Pixelify Sans, monospace">{Math.round(level * 100)}%</text>
-    </svg>
+    <div class="fuel-tank3d" role="img" aria-label={`Fuel ${pct} percent`}>
+      <canvas ref={ref} />
+      <div class="fuel-marks" aria-hidden="true">{[50, 25, 10].map((m) => <span key={m} class={`plaque ${level * 100 <= m ? (m === 10 ? 'crit' : m === 25 ? 'warn' : 'steel') : 'steel'}`}>{m}%</span>)}</div>
+      <span class={`plaque ${tone} fuel-pct tnum`}>{pct}%</span>
+    </div>
   );
 }
 

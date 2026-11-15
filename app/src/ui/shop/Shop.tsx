@@ -9,7 +9,8 @@ import { Btn, Tabs, Win, Empty } from '../common/kit';
 import { Icon, type IconName } from '../common/icons';
 import { CATALOG, catalogById, isStarter, ownsItem } from '../../economy/catalog';
 import { buyItem } from '../../economy/genes';
-import { itemThumb } from '../../economy/pixelart';
+import { VoxView } from './vox/VoxView';
+import { itemOnPedestal, stationArt, RARITY_COLOR } from './vox/models';
 
 type Tab = 'hq' | 'arcade' | 'wear' | 'skins' | 'ledger';
 
@@ -53,7 +54,7 @@ export function Shop({ close }: { arg: unknown; close: () => void }) {
   };
 
   return (
-    <Win title="GENE-O-MAT" icon="shop" onClose={close} actions={<Btn size="sm" tone="ghost" icon="trophy" onClick={() => setPanel('achievements')}>Badges</Btn>}>
+    <Win title="GENE-O-MAT" icon="shop" onClose={close} actions={<StationBar />}>
       <Tabs value={tab} tabs={TABS.map((t) => ({ id: t.id, label: t.label, icon: t.icon }))} onChange={(t) => { setTab(t); setCat('all'); setSel(null); }} />
       <div class="vend">
         <div class="vend-glass">
@@ -71,15 +72,13 @@ export function Shop({ close }: { arg: unknown; close: () => void }) {
                   const has = ownsItem(eco.owned, it.id);
                   return (
                     <button type="button" key={it.id} class={`vend-slot r-${it.rarity} ${dropping === it.id ? 'dropping' : ''}`} aria-pressed={sel === it.id}
-                      onMouseEnter={() => sfx('hover', .1)} onClick={() => { sfx('blip', .35, 1 + Math.random() * .2); setSel(it.id); }} title={it.blurb}>
-                      {it.placeable && owned > 0 && <span class="chip g owned" style={{ height: '18px', padding: '0 6px' }}>×{owned}</span>}
-                      {!it.placeable && has && <span class="chip g owned" style={{ height: '18px', padding: '0 6px' }}><Icon name="check" size="sm" /></span>}
-                      <img class="thumb pixelated" src={itemThumb(it.id)} alt="" />
-                      <div class="coil" />
-                      <div class="tag">
-                        <span class="nm">{it.name}</span>
-                        <span class="price">{isStarter(it.id) ? 'FREE' : <><Icon name="dna" size="sm" />{it.price}</>}</span>
-                      </div>
+                      style={{ ['--rar' as any]: '#' + RARITY_COLOR[it.rarity].toString(16).padStart(6, '0') }}
+                      onMouseEnter={() => sfx('hover', .1)} onClick={() => { sfx('blip', .35, 1 + Math.random() * .2); setSel(it.id); }} aria-label={it.name}>
+                      {it.placeable && owned > 0 && <span class="owned tnum">×{owned}</span>}
+                      {!it.placeable && has && <span class="owned"><Icon name="check" size="sm" /></span>}
+                      <VoxView class="thumb" size={112} spin="hover" cacheKey={`shop:${it.id}`} make={() => itemOnPedestal(it.id)} title={it.name} />
+                      <span class="nm-hover">{it.name}</span>
+                      <span class="plaque">{isStarter(it.id) ? <b>FREE</b> : <><Icon name="dna" size="sm" /><b class="tnum">{it.price}</b></>}</span>
                     </button>
                   );
                 })}
@@ -115,9 +114,9 @@ function Detail({ item, onBuy, onPlace }: { item: CatalogItem; onBuy: (i: Catalo
   const wearable = ['hat', 'outfit', 'accessory', 'skin', 'expression'].includes(item.category);
   return (
     <>
-      <img key={item.id} class="big pixelated" src={itemThumb(item.id)} alt={item.name} />
+      <VoxView key={item.id} class="big" size={180} spin="always" eager cacheKey={`shop-big:${item.id}`} make={() => itemOnPedestal(item.id)} alt={item.name} />
       <div class="col gap-4" style={{ textAlign: 'center' }}>
-        <span class={`rarity ${item.rarity}`}>{item.rarity} · {CAT_LABEL[item.category]}</span>
+        <span class={`rarity ${item.rarity}`}><i class="rar-gem" />{CAT_LABEL[item.category]}</span>
         <h3 style={{ fontSize: '19px' }}>{item.name}</h3>
         <p class="dim" style={{ margin: 0, fontSize: '13px' }}>{item.blurb}</p>
       </div>
@@ -154,6 +153,27 @@ function Ledger() {
           <span class="dimmer">{fmtAgo(r.ts)}</span>
           <span class={`amt tnum px ${r.amount >= 0 ? 'pos' : 'neg'}`}>{r.amount >= 0 ? '+' : ''}{r.amount}</span>
         </div>
+      ))}
+    </div>
+  );
+}
+
+/** The dock is gone: the vending machine carries little 3D shortcuts to its sister stations. */
+function StationBar() {
+  const go = (fn: () => void) => () => { sfx('select', .45); fn(); };
+  const items: { k: 'wardrobe' | 'edit' | 'badges' | 'slots' | 'arcade'; label: string; on: () => void }[] = [
+    { k: 'wardrobe', label: 'Wardrobe', on: () => setPanel('wardrobe') },
+    { k: 'edit', label: 'Edit HQ — place & move furniture', on: () => { editMode.value = true; setPanel(null); } },
+    { k: 'slots', label: 'Idea Slot Machine', on: () => setPanel('slot') },
+    { k: 'arcade', label: 'Arcade', on: () => setPanel('arcade') },
+    { k: 'badges', label: 'Badges', on: () => setPanel('achievements') },
+  ];
+  return (
+    <div class="station-bar">
+      {items.map((s) => (
+        <button type="button" key={s.k} class="station-btn" onClick={go(s.on)} onMouseEnter={() => sfx('hover', .12)} aria-label={s.label} data-tip={s.label}>
+          <VoxView size={40} spin="hover" cacheKey={`station:${s.k}`} make={() => stationArt(s.k)} fill={0.96} />
+        </button>
       ))}
     </div>
   );

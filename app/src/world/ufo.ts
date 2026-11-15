@@ -1,50 +1,75 @@
-// Tiny voxel UFOs patrolling the night sky over the alley. Click one and it panics.
+// Little voxel UFOs cruising past the viewport out in space, each with a tiny alien pilot
+// under a glass dome. Click one and it panics, spins and zooms off.
 import * as THREE from 'three';
-import { Vox, voxMesh } from './voxel';
+import { M, S } from '../vox/core';
+import { PAL, grid, mesh, glowMat } from '../vox/props/kit';
 import type { Particles } from './particles';
+
+let proto: THREE.Object3D | null = null;
+function ufoModel(): THREE.Object3D {
+  if (proto) return proto.clone(true);
+  const root = new THREE.Group();
+  const g = grid([-16, -6, -16], [16, 14, 16], 1);
+  g.add(S.ellipsoid([0, 0, 0], [15, 3.2, 15]), (x, y, z) => {
+    const r = Math.hypot(x, z);
+    if (Math.abs(y) < 0.6) return PAL.hullDeep;                                 // seam
+    if (y > 0) return r > 11 ? PAL.steel : PAL.chrome;
+    return Math.floor(Math.atan2(z, x) * 6 / Math.PI) % 2 ? PAL.steelDark : PAL.hullDark;
+  }, M.metal);
+  g.add(S.cyl(0, 0, 5, -5, -2.5), PAL.hullDeep, M.metal);
+  g.add(S.cyl(0, 0, 3.6, -5.6, -4.8), 0xffffff, M.glow);                         // tractor emitter
+  // pilot under the dome: a tiny glob with big eyes
+  g.add(S.ellipsoid([0, 5.2, 0], [3.6, 3.4, 3.4]), 0x6fd062, M.jelly);
+  for (const sx of [-1, 1]) g.add(S.ellipsoid([sx * 1.5, 5.4, 2.7], [1, 1.4, 0.8]), 0x05070a, M.gloss);
+  g.add(S.sphere([0, 7.4, 0], 6.6), 0xbff4ff, M.glass);
+  g.carve(S.sphere([0, 7.4, 0], 5.8));
+  g.add(S.ellipsoid([0, 5.2, 0], [3.6, 3.4, 3.4]), 0x6fd062, M.jelly);
+  for (const sx of [-1, 1]) g.add(S.ellipsoid([sx * 1.5, 5.4, 2.7], [1, 1.4, 0.8]), 0x05070a, M.gloss);
+  g.carve(S.box([-16, -6, -16], [16, 2.6, 16]));                                  // keep the saucer below the dome
+  g.add(S.ellipsoid([0, 0, 0], [15, 3.2, 15]), (x, y, z) => { const r = Math.hypot(x, z); if (Math.abs(y) < 0.6) return PAL.hullDeep; if (y > 0) return r > 11 ? PAL.steel : PAL.chrome; return Math.floor(Math.atan2(z, x) * 6 / Math.PI) % 2 ? PAL.steelDark : PAL.hullDark; }, M.metal);
+  const body = mesh(g, { castShadow: false });
+  root.add(body);
+  const lg = grid([-16, -2, -16], [16, 2, 16], 1);
+  for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; lg.add(S.sphere([Math.cos(a) * 13.2, 0, Math.sin(a) * 13.2], 1.3), 0xffffff, M.glow); }
+  const lights = mesh(lg, { castShadow: false }); lights.name = 'lights';
+  root.add(lights);
+  proto = root;
+  return root.clone(true);
+}
+
+const COLORS = [0x8cf56b, 0xff6fd6, 0x52f2ff];
 
 export class Ufo {
   group = new THREE.Group();
-  private beam: THREE.Mesh;
-  private lights: THREE.Mesh[] = [];
-  private t0 = Math.random() * 100;
+  private model: THREE.Object3D;
+  private lightMat: THREE.MeshBasicMaterial;
   private panic = 0;
-  private beamT = 0;
+  private x: number;
+  private speed: number;
+  private y0: number; private z0: number;
   constructor(private idx: number, color: number) {
-    const v = new Vox();
-    v.cyl(0, 0, 7, 0, 1, 0x9aa69e).cyl(0, 0, 5.5, 1, 2, 0xb8c0c6).cyl(0, 0, 4, -1, 0, 0x56645e);
-    v.ellipsoid(0, 2.5, 0, 3, 2.4, 3, color, 1.3);
-    v.set(-1, 3, 2, 0x111111).set(1, 3, 2, 0x111111);
-    const body = voxMesh(v, { size: 0.12, center: 'xz' });
-    this.group.add(body);
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      const l = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.12), new THREE.MeshBasicMaterial({ color: 0xffe14d, toneMapped: false }));
-      l.position.set(Math.cos(a) * 0.78, 0.06, Math.sin(a) * 0.78);
-      this.group.add(l); this.lights.push(l);
-    }
-    this.beam = new THREE.Mesh(new THREE.ConeGeometry(1.1, 5, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0x9dff8a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
-    this.beam.position.y = -2.5;
-    this.group.add(this.beam);
+    this.model = ufoModel();
+    this.model.scale.setScalar(1.5 + idx * 0.4);
+    this.lightMat = glowMat(color ?? COLORS[idx % 3], 2);
+    this.model.getObjectByName('lights')!.traverse((c) => { const m = c as THREE.Mesh; if (m.isMesh) m.material = this.lightMat; });
+    this.group.add(this.model);
     this.group.userData.ufo = this;
-    this.group.scale.setScalar(1.1);
+    this.x = -30 + idx * 22;
+    this.speed = 1.6 + idx * 0.7;
+    this.y0 = -1.2 - idx * 1.6;
+    this.z0 = -22 - idx * 7;
   }
   poke() { this.panic = 2.5; }
   update(dt: number, t: number, fx: Particles) {
-    const T = t * (0.06 + this.idx * 0.015) + this.t0;
-    let x: number, y: number, z: number;
-    if (this.idx === 0) { x = Math.sin(T) * 18; y = 11 + Math.sin(T * 2.3) * 1.2; z = -16 + Math.cos(T * 0.7) * 5; }
-    else if (this.idx === 1) { x = Math.cos(T * 1.3) * 24; y = 14 + Math.sin(T * 1.7) * 2; z = -26 + Math.sin(T) * 6; }
-    else { x = Math.sin(T * 0.9) * 10 + 4; y = 9.5 + Math.sin(T * 3) * 0.5; z = -11 + Math.cos(T * 1.1) * 3; }
-    if (this.panic > 0) { this.panic -= dt; x += Math.sin(t * 30) * 0.4 * this.panic; y += (2.5 - this.panic) * 3; }
-    this.group.position.set(x, y, z);
-    this.group.rotation.y += dt * (this.panic > 0 ? 12 : 1.2);
-    this.group.rotation.z = Math.sin(t * 1.4 + this.t0) * 0.08;
-    this.lights.forEach((l, i) => ((l.material as THREE.MeshBasicMaterial).color.setHex(Math.floor(t * 6 + i) % 3 === 0 ? 0xff6fd6 : Math.floor(t * 6 + i) % 3 === 1 ? 0x52f2ff : 0xffe14d)));
-    this.beamT -= dt;
-    if (this.beamT < -6 - this.idx * 3) this.beamT = 2.5;
-    const bm = this.beam.material as THREE.MeshBasicMaterial;
-    bm.opacity = this.beamT > 0 ? 0.16 + Math.sin(t * 20) * 0.03 : Math.max(0, bm.opacity - dt);
-    if (this.beamT > 0 && Math.random() < dt * 10) fx.emit({ tile: 'sparkle', pos: [x + (Math.random() - 0.5) * 1.2, y - 4 + Math.random() * 3, z + (Math.random() - 0.5) * 1.2], vel: [0, 1.4, 0], life: 0.8, size: 0.2, color: '#9dff8a', additive: true });
+    const sp = this.speed * (this.panic > 0 ? 6 : 1);
+    this.x += sp * dt;
+    if (this.x > 38) { this.x = -38; }
+    this.panic = Math.max(0, this.panic - dt);
+    this.group.position.set(this.x, this.y0 + Math.sin(t * 0.9 + this.idx * 2) * 0.6, this.z0 + Math.cos(t * 0.5 + this.idx) * 1.2);
+    this.model.rotation.y += dt * (this.panic > 0 ? 18 : 1.2);
+    this.model.rotation.z = Math.sin(t * 1.3 + this.idx) * 0.12 + (this.panic > 0 ? Math.sin(t * 30) * 0.3 : 0);
+    const k = Math.sin(t * 6 + this.idx) > 0 ? 2.2 : 1.1;
+    this.lightMat.color.set(COLORS[this.idx % 3]).multiplyScalar(k);
+    if (this.panic > 0 && Math.random() < dt * 30) fx.emit({ tile: 'sparkle', pos: this.group.position.clone(), vel: [-3, 0, 0], spread: [1, 1, 1], life: 0.6, size: 0.3, color: '#ffffff', additive: true });
   }
 }

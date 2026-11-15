@@ -85,14 +85,14 @@ export async function openWidget() {
   sfx('ufo', .4);
   if (supportsPiP()) {
     try {
-      const pip = await window.documentPictureInPicture!.requestWindow({ width: 340, height: 250 });
+      const pip = await window.documentPictureInPicture!.requestWindow({ width: 360, height: 270 });
       mountInto(pip, 'pip');
       toast('Lab widget is floating on top of your other apps', 'good', 'widget');
       return;
     } catch (err) { console.warn('[widget] PiP refused', err); }
   }
   if (!isArtifact()) {
-    const w = window.open('', 'glob-labs-widget', 'popup,width=340,height=260');
+    const w = window.open('', 'glob-labs-widget', 'popup,width=360,height=280');
     if (w) { mountInto(w, 'popup'); toast('Widget opened in a small window — keep it beside your other apps', 'info', 'widget'); return; }
   }
   mountInPage();

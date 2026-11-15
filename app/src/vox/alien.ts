@@ -50,7 +50,7 @@ function palette(look: AlienLook): Pal {
     ink: shade(mix(mid, 0x0a3a1a, 0.55), 0.42), skinMat: M.jelly, eye: 0x07090c, eyeMat: M.gloss, ...extra,
   });
   switch (look.skin) {
-    case 'pounce': return { top: 0xf4f6f8, mid: 0xe2e7ec, bot: 0xc9d0d8, belly: 0xffffff, ink: 0x2a2e36, skinMat: M.fur, cat: true, eye: 0x0b0d12, eyeMat: M.gloss };
+    case 'pounce': return { top: 0xf4f6f8, mid: 0xe2e7ec, bot: 0xc9d0d8, belly: 0xffffff, ink: 0x3a3f48, skinMat: M.fur, cat: true, eye: 0x101116, eyeMat: M.gloss };
     case 'pickle': return base(0x5f9a2e, { bumps: true, top: 0x8cc04a, bot: 0x3f6e1c });
     case 'bubblegum': return base(0xff8fd0, { top: 0xffc4e8, bot: 0xd9559e, ink: 0x6a1a48 });
     case 'ghost': return base(0x7ff0ff, { top: 0xd8fdff, bot: 0x3fb8d8, ink: 0x0f4a66, ghost: true });
@@ -62,8 +62,8 @@ function palette(look: AlienLook): Pal {
 }
 
 // ── geometry constants (voxels) ──────────────────────────────────────────────
-const HEAD_R: V3 = [17, 16, 15.5];
-const HEAD_Y = 34;            // head centre above the feet
+export const HEAD_R: V3 = [17, 16, 15.5];
+export const HEAD_Y = 34;     // head centre above the feet
 const FACE_DEPTH = 4;         // face layer thickness in voxels (expressions swap this)
 /** Voxels per model unit for aliens — the detail level. */
 export const ALIEN_RES = 1.6;
@@ -85,8 +85,8 @@ type Px = 'skin' | 'eye' | 'hi' | 'mouth' | 'tongue' | 'tear' | 'blush' | 'heart
 interface EyeSpec { cx: number; cy: number; rx: number; ry: number; rot: number }
 const EYE_R: EyeSpec = { cx: 7.8, cy: -1.4, rx: 6.0, ry: 9.4, rot: -0.48 };
 const EYE_L: EyeSpec = { cx: -7.8, cy: -1.4, rx: 6.0, ry: 9.4, rot: 0.48 };
-const CAT_R: EyeSpec = { cx: 6.8, cy: 0.5, rx: 5.0, ry: 6.0, rot: -0.22 };
-const CAT_L: EyeSpec = { cx: -6.8, cy: 0.5, rx: 5.0, ry: 6.0, rot: 0.22 };
+const CAT_R: EyeSpec = { cx: 7.3, cy: 0.8, rx: 4.9, ry: 5.5, rot: -0.24 };
+const CAT_L: EyeSpec = { cx: -7.3, cy: 0.8, rx: 4.9, ry: 5.5, rot: 0.24 };
 
 /** the open almond eye with highlights (light from the upper right for both eyes). */
 function openEye(x: number, y: number, e: EyeSpec, k = 1, hiScale = 1): Px | null {
@@ -166,7 +166,7 @@ function facePixel(face: Face, x: number, y: number, cat: boolean): Px | null {
   // mouths / extras
   if (cat) {
     // pink nose + little "w" mouth live on the muzzle (built separately); blush only
-    if (face === 'love' || face === 'happy') { if (ell(x, y, -12.2, -5.5, 2.2, 1.2).d <= 1 || ell(x, y, 12.2, -5.5, 2.2, 1.2).d <= 1) return 'blush'; }
+    if (face === 'love') { if (ell(x, y, -12.2, -5.5, 2.2, 1.2).d <= 1 || ell(x, y, 12.2, -5.5, 2.2, 1.2).d <= 1) return 'blush'; }
     if (face === 'cry' && (Math.abs(x - 7.2) < 1 || Math.abs(x + 7.2) < 1) && y < -5 && y > -13) return 'tear';
     return null;
   }
@@ -191,41 +191,135 @@ function facePixel(face: Face, x: number, y: number, cat: boolean): Px | null {
   return null;
 }
 
+// ── shared geometry for cosmetics (model units) ──────────────────────────────
+/** The head's outer surface (head-centred frame). Cat heads are a bit wider with cheeks. */
+export function headShape(cat: boolean) {
+  if (!cat) return S.ellipsoid([0, 0, 0], HEAD_R);
+  let s = smoothUnion(S.ellipsoid([0, 0, 0], [17.5, 15.4, 15.6]), S.ellipsoid([-10.5, -6.4, 4.5], [7.2, 6.4, 7.6]), 3.5);
+  return smoothUnion(s, S.ellipsoid([10.5, -6.4, 4.5], [7.2, 6.4, 7.6]), 3.5);
+}
+/** The body's outer surface (feet-origin frame). */
+export function bodyShape(cat: boolean) {
+  return cat
+    ? smoothUnion(S.ellipsoid([0, 11.5, 0], [8.6, 9.6, 7.6]), S.ellipsoid([0, 5.2, 0.4], [9.4, 5.2, 8]), 3.2)
+    : smoothUnion(S.ellipsoid([0, 11, 0], [7.6, 9, 6.8]), S.ellipsoid([0, 5.5, 0.5], [8.2, 5, 7]), 3);
+}
+/** Antenna stalk keep-out capsules in the head frame (hats carve these so they never clip). */
+export function antennaClearance(): { a: V3; b: V3; r: number }[] {
+  const out: { a: V3; b: V3; r: number }[] = [];
+  for (const sx of [-1, 1]) {
+    const th = -sx * 0.28, c = Math.cos(th), s = Math.sin(th);
+    const tf = (x: number, y: number, z: number): V3 => [x * c - y * s + sx * 7.2, x * s + y * c + 13.2, z - 1.5];
+    const p0 = tf(0, 0, 0), p1 = tf(sx * 1.2, 6, 0.2), p2 = tf(sx * 3.2, 11.5, 0.5);
+    out.push({ a: p0, b: p1, r: 2.6 }, { a: p1, b: p2, r: 2.5 });
+  }
+  return out;
+}
+/** Cat ear keep-out ellipsoids in the head frame. */
+export const CAT_EARS: { c: V3; r: V3 }[] = [{ c: [-10.4, 12.6, -2.2], r: [6.2, 6, 3.4] }, { c: [10.4, 12.6, -2.2], r: [6.2, 6, 3.4] }];
+/** where the arm pivots sit (feet-origin frame), for sleeves */
+export const ARM_PIVOT = { glob: [6.4, 14.5, 3] as V3, cat: [6.6, 15.5, 4.2] as V3 };
+
 // ── part builders ────────────────────────────────────────────────────────────
 function headColor(p: Pal, x: number, y: number, z: number) {
   const t = (y + HEAD_R[1]) / (HEAD_R[1] * 2); // 0 bottom → 1 top
   let c = t > 0.5 ? mix(p.mid, p.top, (t - 0.5) / 0.5) : mix(p.bot, p.mid, Math.pow(t / 0.5, 0.8));
-  if (p.cat) c = catFur(p, x, y + HEAD_Y, z, 1);
+  if (p.cat) c = catFur(p, x, y, z, 'head');
   if (p.bumps && hash3(x >> 1, y >> 1, z >> 1, 7) > 0.86) c = shade(c, 1.12);
   return c;
 }
 
-function catFur(p: Pal, x: number, y: number, z: number, scale = 1) {
-  // snow leopard: pale silver-white fur, black rosettes (rings with a smoky centre), tiny forehead speckles
-  const base = mix(p.mid, p.top, Math.max(0, Math.min(1, (y - 20) / 30)));
-  const n = fbm(x * 0.16 * scale, y * 0.16 * scale, z * 0.16 * scale, 3, 11);
-  const ring = Math.abs(n - 0.64);
-  if (n > 0.64 && n < 0.69) return 0x2c2d33;
-  if (n >= 0.69) return mix(base, 0xb7bec7, 0.65);
-  if (ring < 0.012) return 0x3a3b42;
-  // forehead speckles
-  if (y > HEAD_Y + 6 && z > 2 && hash3(x, y, z, 5) > 0.93) return 0x3a3b42;
-  return base;
+// ── Snow-leopard fur ─────────────────────────────────────────────────────────
+// Clean, structured pattern (no noise speckle): rosettes are broken dark rings with a
+// smoky centre laid out on a jittered 3D grid; the forehead and limbs get small solid
+// spots; muzzle, chest and paws stay snow white.
+const FUR_HI = 0xf3f5f7, FUR_MID = 0xe2e6ea, FUR_LO = 0xc9cfd6, ROSETTE = 0x2a2b31, SMOKE = 0xaeb5bf, SPOT = 0x34353c;
+
+function nearestCell(x: number, y: number, z: number, cell: number, seed: number, ax = 1, ay = 1, az = 1) {
+  const ci = Math.floor(x / cell), cj = Math.floor(y / cell), ck = Math.floor(z / cell);
+  let best = Infinity, bx = 0, by = 0, bz = 0, bh = 0;
+  for (let k = ck - 1; k <= ck + 1; k++) for (let j = cj - 1; j <= cj + 1; j++) for (let i = ci - 1; i <= ci + 1; i++) {
+    const h = hash3(i, j, k, seed);
+    const cx = (i + 0.2 + 0.6 * h) * cell, cy = (j + 0.2 + 0.6 * hash3(i, j, k, seed + 1)) * cell, cz = (k + 0.2 + 0.6 * hash3(i, j, k, seed + 2)) * cell;
+    const d = ((x - cx) * ax) ** 2 + ((y - cy) * ay) ** 2 + ((z - cz) * az) ** 2;
+    if (d < best) { best = d; bx = cx; by = cy; bz = cz; bh = h; }
+  }
+  return { d: Math.sqrt(best), dx: x - bx, dy: y - by, dz: z - bz, h: bh };
+}
+
+/** rosette at a point: 'ring' | 'smoke' | null */
+function rosette(x: number, y: number, z: number, cell: number, seed = 31): 'ring' | 'smoke' | null {
+  const n = nearestCell(x, y, z, cell, seed);
+  const R = cell * (0.3 + 0.12 * n.h);
+  if (n.d > R) return null;
+  if (n.d > R * 0.6) {
+    // broken ring: 3–4 dark petals
+    const a = Math.atan2(n.dy, n.dx + n.dz * 0.6);
+    return Math.sin(a * (3 + Math.floor(n.h * 2)) + n.h * 9) > -0.55 ? 'ring' : null;
+  }
+  return 'smoke';
+}
+function spot(x: number, y: number, z: number, cell: number, r: number, seed = 47, ax = 1, ay = 1, az = 1) {
+  const n = nearestCell(x, y, z, cell, seed, ax, ay, az);
+  return n.d < cell * r * (0.75 + 0.5 * n.h);
+}
+
+type FurRegion = 'head' | 'body' | 'limb' | 'tail' | 'ear';
+/** Snow-leopard fur colour. Coordinates in the PART's own frame (head: head-centred). */
+function catFur(p: Pal, x: number, y: number, z: number, region: FurRegion = 'body'): number {
+  void p;
+  const shadeY = (lo: number, hi: number, t: number) => mix(lo, hi, Math.max(0, Math.min(1, t)));
+  if (region === 'head') {
+    const base = shadeY(0xcdd3da, FUR_HI, (y + 8) / 24);
+    const front = z > 7.5;
+    // white muzzle, chin and cheek fluff
+    if (front && y < -2.6 && Math.abs(x) < 11.5) return mix(FUR_HI, 0xffffff, 0.65);
+    // soft grey mask round the eyes and down the nose bridge (like the photo)
+    if (front && y < 6 && y > -2.6 && Math.abs(x) < 2.6) return mix(0xc9cfd6, base, Math.abs(x) / 2.6);
+    // the dense speckle cluster on the forehead (densest at the top centre)
+    if (y > 5 && z > -2) {
+      const k = Math.max(0, 1 - Math.hypot(x / 10, (y - 11) / 8));
+      if (spot(x, y, z, 1.85, 0.2 + k * 0.2, 53)) return SPOT;
+      return base;
+    }
+    // streaky dark spots on the cheeks / sides / back of the head
+    if (!front || Math.abs(x) > 11) { if (spot(x, y, z, 4.6, 0.3, 59, 0.6, 1.5, 0.6)) return ROSETTE; }
+    return base;
+  }
+  if (region === 'body') {
+    const base = shadeY(FUR_LO, FUR_MID, y / 18);
+    if (z > 3 && Math.abs(x) < 5.5 && y < 17) return mix(FUR_HI, 0xffffff, 0.7); // white chest
+    const r = rosette(x, y, z, 8.2, 7);
+    if (r === 'ring') return ROSETTE; if (r === 'smoke') return mix(base, SMOKE, 0.45);
+    if (spot(x, y, z, 4.4, 0.24, 83, 0.55, 1.6, 0.55)) return ROSETTE;
+    return base;
+  }
+  if (region === 'limb') return spot(x, y, z, 2.8, 0.26, 61) ? SPOT : FUR_MID;
+  if (region === 'ear') return FUR_MID;
+  return FUR_MID;
 }
 
 function buildHead(p: Pal, look: AlienLook) {
   const g = VoxGrid.span([-22, -22, -22], [22, 26, 22], ALIEN_RES);
   const col = (x: number, y: number, z: number) => headColor(p, x, y, z);
   if (p.cat) {
-    g.add(S.ellipsoid([0, -0.5, 0], [17, 14.8, 15]), col, p.skinMat as any);
-    // fluffy cheeks
-    g.add(S.ellipsoid([-11, -6, 4], [6.5, 6, 7]), col, p.skinMat as any);
-    g.add(S.ellipsoid([11, -6, 4], [6.5, 6, 7]), col, p.skinMat as any);
-    // round ears with pink-grey inners and dark rims
+    const fur = (x: number, y: number, z: number) => catFur(p, x, y, z, 'head');
+    // a round fluffy kitten head with chubby cheeks melted in
+    let shape = smoothUnion(S.ellipsoid([0, 0, 0], [17.5, 15.4, 15.6]), S.ellipsoid([-10.5, -6.4, 4.5], [7.2, 6.4, 7.6]), 3.5);
+    shape = smoothUnion(shape, S.ellipsoid([10.5, -6.4, 4.5], [7.2, 6.4, 7.6]), 3.5);
+    g.add(shape, fur, M.fur);
+    // cheek fluff tufts along the jaw line
+    for (let i = 0; i < 9; i++) for (const sx of [-1, 1]) {
+      const a = -0.25 - i * 0.16;
+      const c: V3 = [sx * (16.4 + Math.sin(i) * 0.4) * Math.cos(a * 0.6), -6 + Math.sin(a) * 6, 3.5 - i * 0.6];
+      g.add(S.cone(c[0], c[2], c[1] - 1.4, c[1] + 1.4, 1.6, 0.4), fur, M.fur);
+    }
+    // round ears: dark backs, pale fuzzy fronts with a pink-grey heart
     for (const sx of [-1, 1]) {
-      const c: V3 = [sx * 10.5, 12.5, -1.5];
-      g.add(S.ellipsoid(c, [5.8, 6.4, 2.6]), (x, y) => (y > c[1] + 3.6 ? 0x2c2d33 : catFur(p, x, y + HEAD_Y, 0)), M.fur);
-      g.paint(S.ellipsoid([c[0], c[1] - 0.6, c[2] + 1.8], [3.4, 4, 1.5]), 0xd9a6b0, M.fur);
+      const c: V3 = [sx * 10.4, 12.6, -2.2];
+      g.add(S.ellipsoid(c, [5.6, 5.4, 2.8]), (x, y, z) => (z < c[2] - 0.4 ? ROSETTE : y > c[1] + 3.8 ? ROSETTE : FUR_MID), M.fur);
+      g.paint(S.ellipsoid([c[0], c[1] - 0.4, c[2] + 1.9], [3.4, 3.4, 1.4]), 0xd9b4bc, M.fur);
+      g.paint(S.ellipsoid([c[0], c[1] - 1.2, c[2] + 2.3], [2, 2, 1]), 0xf2e6e9, M.fur);
     }
   } else {
     const head = S.ellipsoid([0, 0, 0], HEAD_R);
@@ -284,37 +378,48 @@ function paintFace(face: Face, cells: [number, number, number][], head: VoxGrid,
 function buildBody(p: Pal) {
   const g = VoxGrid.span([-13, -2, -12], [13, 24, 12], ALIEN_RES);
   const col = (x: number, y: number, z: number) => {
-    if (p.cat) return z > 3 && Math.abs(x) < 5 && y < 16 ? mix(0xffffff, p.top, 0.2) : catFur(p, x, y, z);
+    if (p.cat) return catFur(p, x, y, z, 'body');
     const t = y / 22;
     let c = mix(shade(p.bot, 0.92), mix(p.bot, p.mid, 0.6), Math.min(1, t));
     if (z > 4 && Math.abs(x) < 4.5 && y > 4 && y < 15) c = mix(c, p.belly, 0.35);
     return c;
   };
-  if (p.cat) g.add(smoothUnion(S.ellipsoid([0, 11, 0], [8.4, 9.4, 7.4]), S.ellipsoid([0, 5, 0], [9, 5, 7.8]), 3), col, p.skinMat as any);
+  if (p.cat) g.add(smoothUnion(S.ellipsoid([0, 11.5, 0], [8.6, 9.6, 7.6]), S.ellipsoid([0, 5.2, 0.4], [9.4, 5.2, 8]), 3.2), col, M.fur);
   else g.add(smoothUnion(S.ellipsoid([0, 11, 0], [7.6, 9, 6.8]), S.ellipsoid([0, 5.5, 0.5], [8.2, 5, 7]), 3), col, p.skinMat as any);
   return g;
 }
 
 function buildArm(p: Pal, paw: boolean) {
-  const g = VoxGrid.span([-7, -11, -6], [7, 5, 8], ALIEN_RES);
-  const col = (x: number, y: number, z: number) => p.cat ? catFur(p, x + 30, y, z) : mix(p.bot, p.mid, 0.6 + y * 0.03);
-  if (paw) {
-    // the snow leopard's raised paw: chunky, with black pads facing the viewer
-    g.add(S.capsule([0, 2, 0], [0, -4, 1.5], 3.2, 4.2), col, p.skinMat as any);
-    g.add(S.ellipsoid([0, -6, 2], [5, 4.6, 4]), col, p.skinMat as any);
-    g.paint(S.ellipsoid([0, -7.4, 5.2], [2.4, 1.9, 1.2]), 0x1b1c22, M.gloss);
-    for (const [bx, by] of [[-2.8, -3.6], [-0.9, -2.6], [1.1, -2.6], [3, -3.6]]) g.paint(S.ellipsoid([bx, by, 5.3], [0.95, 1.1, 1]), 0x1b1c22, M.gloss);
-  } else {
-    g.add(S.ellipsoid([0, -3, 2], [3.1, 3.4, 3.1]), col, p.skinMat as any);
+  const g = VoxGrid.span([-10, -11, -7], [8, 17, 16], ALIEN_RES);
+  if (p.cat && paw) {
+    // the snow leopard's RAISED paw: reaching forward in front of the chin, beans facing the viewer
+    const fur = (x: number, y: number, z: number) => (z > 6.5 ? mix(FUR_HI, 0xffffff, 0.6) : catFur(p, x, y, z, 'limb'));
+    const P: V3 = [-2.4, 5.4, 10];
+    g.add(S.capsule([0, 0, 0], [-1.6, 3.6, 5.6], 3.4, 3.7), fur, M.fur);
+    g.add(S.ellipsoid(P, [5.2, 5.0, 3.6]), fur, M.fur);
+    for (const tx of [-3.3, -1.15, 1.15, 3.3]) g.add(S.sphere([P[0] + tx, P[1] + 3.8 - Math.abs(tx) * 0.4, P[2] + 0.6], 1.7), fur, M.fur);
+    // big main pad + four toe beans on the front face
+    g.paint(S.ellipsoid([P[0], P[1] - 1.1, P[2] + 3.4], [2.6, 2.1, 1.6]), 0x16171c, M.gloss);
+    for (const [bx, by] of [[-3.3, 2.5], [-1.15, 3.7], [1.15, 3.7], [3.3, 2.5]] as const) g.paint(S.ellipsoid([P[0] + bx, P[1] + by, P[2] + 3.2], [0.95, 1.05, 1.6]), 0x16171c, M.gloss);
+    return g;
   }
+  if (p.cat) {
+    const fur = (x: number, y: number, z: number) => (y < -4.5 ? FUR_HI : catFur(p, x, y, z, 'limb'));
+    g.add(S.capsule([0, 0, 0], [0, -4, 2], 3.2, 3.5), fur, M.fur);
+    g.add(S.ellipsoid([0, -5.4, 2.6], [3.8, 3.2, 3.6]), fur, M.fur);
+    return g;
+  }
+  const col = (x: number, y: number) => mix(p.bot, p.mid, 0.6 + y * 0.03);
+  g.add(S.ellipsoid([0, -3, 2], [3.1, 3.4, 3.1]), col, p.skinMat as any);
+  void paw;
   return g;
 }
 
 function buildLeg(p: Pal) {
   const g = VoxGrid.span([-6, -6, -6], [6, 4, 9], ALIEN_RES);
-  const col = (x: number, y: number, z: number) => p.cat ? (z > 4 ? 0xf6f7f9 : catFur(p, x + 50, y, z)) : mix(p.bot, p.mid, 0.35 + y * 0.04);
-  g.add(S.ellipsoid([0, -2.6, 1.6], [3.8, 3.1, 4.8]), col, p.skinMat as any);
-  if (p.cat) for (const bx of [-1.6, 0, 1.6]) g.paint(S.sphere([bx, -1.2, 6.2], 0.8), 0xe0b4be, M.fur);
+  const col = (x: number, y: number, z: number) => p.cat ? (z > 3 ? FUR_HI : catFur(p, x, y, z, 'limb')) : mix(p.bot, p.mid, 0.35 + y * 0.04);
+  g.add(S.ellipsoid([0, -2.6, 1.6], p.cat ? [4.2, 3.3, 5.2] : [3.8, 3.1, 4.8]), col, (p.cat ? M.fur : p.skinMat) as any);
+  if (p.cat) for (const bx of [-1.7, 0, 1.7]) g.add(S.sphere([bx, -1.4, 6.4], 1.1), FUR_HI, M.fur);
   return g;
 }
 
@@ -337,15 +442,34 @@ function buildAntenna(p: Pal, side: number, bulb: number) {
 }
 
 function buildTail(p: Pal) {
-  const g = VoxGrid.span([-8, -4, -18], [10, 22, 4], ALIEN_RES);
-  const pts: V3[] = [[0, 2, 0], [2, 4, -5], [4, 8, -9], [4.5, 13, -11], [3, 16.5, -10]];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i + 1];
-    g.add(S.capsule(a, b, 3.4 - i * 0.15, 3.3 - i * 0.15), (x, y, z) => {
-      const ringy = Math.sin((y + z * 0.4) * 0.75) > 0.55;
-      return ringy ? 0x2c2d33 : catFur(p, x + 80, y + 20, z);
-    }, M.fur);
-  }
+  void p;
+  const g = VoxGrid.span([-14, -5, -20], [14, 26, 6], ALIEN_RES);
+  // a thick fluffy snow-leopard tail curling up behind, with clean dark rings
+  const pts: V3[] = [[0, 2, 0], [3, 3, -5], [6.5, 6.5, -8.5], [8, 11.5, -10], [7, 16.5, -9.5], [4.5, 19.5, -8]];
+  const lens: number[] = [0];
+  for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]));
+  const total = lens[lens.length - 1];
+  const along = (x: number, y: number, z: number) => {
+    let best = Infinity, t = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      const ab: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const L2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
+      const h = Math.max(0, Math.min(1, ((x - a[0]) * ab[0] + (y - a[1]) * ab[1] + (z - a[2]) * ab[2]) / L2));
+      const d = (x - a[0] - ab[0] * h) ** 2 + (y - a[1] - ab[1] * h) ** 2 + (z - a[2] - ab[2] * h) ** 2;
+      if (d < best) { best = d; t = (lens[i] + Math.sqrt(L2) * h) / total; }
+    }
+    return t;
+  };
+  const col = (x: number, y: number, z: number) => {
+    const t = along(x, y, z);
+    if (t > 0.9) return ROSETTE;                                   // dark tip
+    if (t > 0.3 && Math.floor(t * 9) % 2 === 1) return ROSETTE;     // rings toward the end
+    if (t <= 0.3) { const r = rosette(x, y, z, 5, 77); if (r === 'ring') return ROSETTE; if (r === 'smoke') return mix(FUR_MID, SMOKE, 0.5); }
+    return FUR_MID;
+  };
+  for (let i = 0; i < pts.length - 1; i++) g.add(S.capsule(pts[i], pts[i + 1], 3.6 + i * 0.05, 3.7 + i * 0.05), col, M.fur);
+  g.add(S.sphere(pts[pts.length - 1], 3.8), col, M.fur);
   return g;
 }
 
@@ -411,7 +535,7 @@ export function buildAlien(look: AlienLook, size = 0.016): AlienParts {
     const paw = !!p.cat && sx === 1;
     g.add(part(key + (paw ? '|paw' : '|arm'), () => toObject(buildArm(p, paw), opts('arm'))));
     g.position.set(V(sx * 6.4), V(14.5), V(3));
-    if (paw) { g.position.set(V(7.6), V(19), V(3)); }
+    if (paw) { g.position.set(V(6.6), V(15.5), V(4.2)); }
     jelly.add(g);
   }
 
@@ -439,15 +563,25 @@ export function buildAlien(look: AlienLook, size = 0.016): AlienParts {
   // cat muzzle, nose, whiskers (static, live on the head)
   if (p.cat) {
     head.add(part(key + '|muzzle', () => {
-      const g = VoxGrid.span([-12, -14, 6], [12, 0, 22], ALIEN_RES);
-      g.add(S.ellipsoid([-2.6, -7.2, 13.2], [3.6, 2.8, 2.6]), 0xfafbfc, M.fur);
-      g.add(S.ellipsoid([2.6, -7.2, 13.2], [3.6, 2.8, 2.6]), 0xfafbfc, M.fur);
-      g.add(S.ellipsoid([0, -4.6, 15.2], [1.9, 1.3, 1.1]), 0xe58a9e, M.jelly);   // pink nose
-      g.add(S.capsule([0, -5.8, 15.3], [0, -7.6, 15.1], 0.45), 0x5a3a44, M.solid);
-      g.add(S.capsule([0, -7.6, 15.1], [-1.8, -8.6, 14.8], 0.45), 0x5a3a44, M.solid);
-      g.add(S.capsule([0, -7.6, 15.1], [1.8, -8.6, 14.8], 0.45), 0x5a3a44, M.solid);
-      for (const sx of [-1, 1]) for (const dy of [0, 1.4]) g.add(S.capsule([sx * 5, -6.4 - dy, 13.5], [sx * 9.8, -5.6 - dy * 1.6, 12.2], 0.35), 0xf0f2f6, M.glow);
-      return toObject(g, { size, name: 'muzzle', castShadow: true });
+      const g = VoxGrid.span([-15, -16, 4], [15, 2, 22], ALIEN_RES);
+      const white = mix(FUR_HI, 0xffffff, 0.75);
+      // two puffy whisker pads + a soft chin
+      g.add(S.ellipsoid([-2.9, -7.4, 13.4], [3.9, 3.0, 2.8]), white, M.fur);
+      g.add(S.ellipsoid([2.9, -7.4, 13.4], [3.9, 3.0, 2.8]), white, M.fur);
+      g.add(S.ellipsoid([0, -10.4, 12.2], [2.6, 1.8, 2.2]), white, M.fur);
+      // pink nose: a rounded inverted triangle with a darker tip line
+      for (let i = 0; i < 4; i++) g.add(S.ellipsoid([0, -4.3 - i * 0.5, 15.5 - i * 0.1], [1.9 - i * 0.44, 0.85, 1.05]), 0xc98e9b, M.jelly);
+      g.add(S.sphere([-0.7, -3.9, 16.3], 0.45), 0xffd0dc, M.glow);
+      // philtrum + smile
+      g.add(S.capsule([0, -6.6, 15.4], [0, -7.5, 15.2], 0.3), 0x9a7c84, M.solid);
+      g.add(S.capsule([0, -7.5, 15.2], [-1.9, -8.4, 14.9], 0.3), 0x9a7c84, M.solid);
+      g.add(S.capsule([0, -7.5, 15.2], [1.9, -8.4, 14.9], 0.3), 0x9a7c84, M.solid);
+      // whisker dots + long white whiskers
+      for (const sx of [-1, 1]) {
+        for (const [dx, dy] of [[1.8, -6.6], [3.2, -7.2], [2.4, -8.2]] as const) g.paint(S.sphere([sx * dx, dy, 15.6], 0.38), 0x8a8f98);
+        for (const [dy, droop] of [[0, 0.4], [1.3, -0.6], [2.6, -1.8]] as const) g.add(S.capsule([sx * 5.6, -6.4 - dy, 13.6], [sx * 13.5, -5.6 - dy + droop, 11.2], 0.32), 0xdfe5ec, M.solid);
+      }
+      return toObject(g, { size, name: 'muzzle', castShadow: true, ao: 0.4 });
     }));
   }
 
@@ -468,7 +602,7 @@ export function buildAlien(look: AlienLook, size = 0.016): AlienParts {
   if (p.cat) {
     tail = new THREE.Group();
     tail.add(part(key + '|tail', () => toObject(buildTail(p), opts('tail'))));
-    tail.position.set(V(2), V(6), V(-6));
+    tail.position.set(V(1.5), V(4.5), V(-5.5));
     jelly.add(tail);
   }
 

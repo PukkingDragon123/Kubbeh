@@ -1,11 +1,11 @@
-// GLOB LABS — the living 3D voxel lab. Boots the renderer, builds the alley HQ, and wires
-// clicks, crew, furniture, UFOs and fuel alarms to the app's state and bus.
+// GLOB LABS — the living 3D voxel mothership lab deck. Boots the renderer, builds the ship,
+// and wires clicks, crew, furniture, UFOs and fuel alarms to the app's state and bus.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { studioEnvironment } from '../vox/mesh';
 import { bus, type SfxName } from '../core/bus';
 import { editMode, fuel, openPanelId, setPanel, settings } from '../core/state';
 import { speakerAnchor, speakerId, PROFESSOR } from '../core/crew';
@@ -38,18 +38,17 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
   if (!renderer.getContext()) throw new Error('WebGL context unavailable');
   const dprCap = () => (settings.value.quality === 'high' ? 2 : settings.value.quality === 'medium' ? 1.5 : 1);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap()));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.0;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = q === 'high';
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x080a14, 30, 110);
-  scene.background = new THREE.Color(0x05060f);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.22;
+  scene.fog = new THREE.Fog(0x060814, 36, 130);
+  scene.background = new THREE.Color(0x03040b);
+  scene.environment = studioEnvironment(renderer);
+  scene.environmentIntensity = 0.42;
 
   const rig = new CameraRig(canvas);
   const fx = new Particles();
@@ -80,7 +79,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
 
   // alarm light (critical fuel)
   const alarm = new THREE.PointLight(0xff2a1a, 0, 30, 1.2); alarm.position.set(0, 6, 0); scene.add(alarm);
-  const hemi = env.group.children.find((o) => (o as THREE.HemisphereLight).isHemisphereLight) as THREE.HemisphereLight | undefined;
+  const hemi: THREE.HemisphereLight | undefined = env.hemi;
   const hemiBase = hemi?.color.clone();
 
   // post
@@ -91,7 +90,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
     if (settings.value.quality === 'low') return;
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, rig.camera));
-    bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), settings.value.quality === 'high' ? 0.55 : 0.45, 0.42, 0.93);
+    bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), settings.value.quality === 'high' ? 0.7 : 0.55, 0.5, 1.0);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
     resize();
@@ -189,7 +188,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
     const p = placements.centerOfItem(target);
     if (p) return rig.focus(p.setY(0.9), 7);
   };
-  (window as any).__glob = { focus: focusImpl, rig, crewCtl, placements, renderer, scene };
+  (window as any).__globWorld = { focus: focusImpl, rig, crewCtl, placements, renderer, scene };
 
   bus.on('ui:open', ({ panel }) => {
     if (settings.value.reduceMotion) return;
@@ -206,7 +205,7 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
 
   // ── loop ───────────────────────────────────────────────────────────────────
   let lastNow = performance.now();
-  let t = 0, frame = 0, ready = false, steamT = 0, dripT = 0, moteT = 0;
+  let t = 0, frame = 0, ready = false, steamT = 0, moteT = 0;
   const v3 = new THREE.Vector3();
   let lastAnchor = '';
   let hoverAlien: string | null = null;
@@ -245,11 +244,11 @@ export async function startWorld(canvas: HTMLCanvasElement): Promise<void> {
     crewCtl.update(dt, t, rig.camera);
     for (const u of ufos) u.update(dt, t, fx);
 
-    // ambience: steam, drips, dust motes in lamp light
-    steamT -= dt; dripT -= dt; moteT -= dt;
-    if (steamT <= 0) { steamT = 0.12; const vnt = env.steamVents[Math.floor(Math.random() * env.steamVents.length)]; fx.emit({ tile: ['steam', 'smoke', 'puff'], pos: vnt, vel: [0.1, 0.9, 0], spread: [0.2, 0.2, 0.2], drag: 0.6, life: [1.4, 2.2], size: [0.35, 0.55], grow: 2.4, color: '#9fb3a8' }); }
-    if (dripT <= 0) { dripT = 0.8 + Math.random() * 1.6; const d = env.drips[Math.floor(Math.random() * env.drips.length)]; const life = Math.sqrt((2 * d.y) / 9.8); fx.emit({ tile: 'drop', pos: d, vel: [0, 0, 0], gravity: 9.8, life, size: 0.1, color: '#9dff8a' }); setTimeout(() => fx.emit({ tile: 'drop', pos: [d.x, 0.05, d.z], count: 4, vel: [0, 1, 0], spread: [0.8, 0.4, 0.8], gravity: 6, life: 0.35, size: 0.06, color: '#c8ffb0' }), life * 1000); }
-    if (moteT <= 0 && !reduce) { moteT = 0.25; const lp = env.lamps[Math.floor(Math.random() * env.lamps.length)].position; fx.emit({ tile: 'dust', pos: [lp.x + (Math.random() - 0.5) * 2, 0.6 + Math.random() * 3, lp.z + (Math.random() - 0.5) * 2], vel: [0, 0.05, 0], spread: [0.1, 0.05, 0.1], life: 4, size: 0.08, color: '#ffe2b0', additive: true, wobble: 0.2 }); }
+    // ambience: vent steam (soft voxel puffs) and dust motes in the lamp cones
+    steamT -= dt; moteT -= dt;
+    if (steamT <= 0) { steamT = 0.16; const vnt = env.steamVents[Math.floor(Math.random() * env.steamVents.length)]; fx.emit({ tile: ['steam', 'puff'], pos: vnt, vel: [0.05, 0.8, 0], spread: [0.25, 0.2, 0.25], drag: 0.6, life: [1.4, 2.2], size: [0.1, 0.16], grow: 2.6, color: '#b8c8d0' }); }
+    if (moteT <= 0 && !reduce) { moteT = 0.22; const lp = env.lamps[Math.floor(Math.random() * env.lamps.length)].position; fx.emit({ tile: 'dust', pos: [lp.x + (Math.random() - 0.5) * 2, 0.6 + Math.random() * 3.6, lp.z + (Math.random() - 0.5) * 2], vel: [0, 0.05, 0], spread: [0.1, 0.05, 0.1], life: 4, size: 0.022, color: '#ffe2b0', additive: true, wobble: 0.2 }); }
+    fx.setCamera(rig.camera);
     fx.update(dt, t);
 
     // fuel alarm

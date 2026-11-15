@@ -12,6 +12,14 @@ import { patchEconomy } from '../../core/state';
 import { LockedStation } from './Locked';
 import { REELS, ideaSentence, type Sym } from './slotData';
 import { complete, engineAvailable } from '../../claude/agent';
+import { VoxView } from './vox/VoxView';
+import { framed } from './vox/models';
+import { buildGlyph, type GlyphName } from './vox/glyphs';
+import { buildLever } from './vox/lever';
+import type * as THREE from 'three';
+
+const symKey = (s: Sym) => `sym:${s.icon}:${s.color}:${s.gold ? 1 : 0}`;
+const symArt = (s: Sym) => framed(buildGlyph(s.icon as GlyphName, parseInt(s.color.slice(1), 16), { gold: s.gold }));
 
 const COST = 5;
 const todayNum = () => Number(todayKey().replace(/-/g, ''));
@@ -62,8 +70,8 @@ function Reel({ symbols, target, spinId, locked, delay, onStop }: { symbols: Sym
       <div ref={strip} class="reel-strip">
         {tripled.map((s, i) => (
           <div key={i} class={`reel-cell ${s.gold ? 'gold' : ''}`}>
-            <span class="gl" style={{ color: s.color }}><Icon name={s.icon} size="lg" /></span>
-            <span class="lb">{s.gold ? '★ ' : ''}{s.label}</span>
+            <VoxView class="gl" size={34} cacheKey={symKey(s)} make={() => symArt(s)} yaw={-0.3} pitch={0.12} fill={0.98} />
+            <span class="lb">{s.label}</span>
           </div>
         ))}
       </div>
@@ -92,6 +100,7 @@ function Machine() {
   const [pitching, setPitching] = useState(false);
   const [win, setWin] = useState<{ n: number; amount: number } | null>(null);
   const stopped = useRef(0);
+  const pullAt = useRef(0);
   const free = (economy.value.stats.slotFreeDay ?? 0) !== todayNum();
   const syms = result.map((r, i) => REELS[i].symbols[r]);
 
@@ -100,7 +109,7 @@ function Machine() {
     if (!free && !spendGenes(COST, 'slot_machine', 'Slot machine spin')) { sfx('error', .5); toast(`A spin costs ${COST} genes`, 'warn', 'dna'); return; }
     if (free) patchEconomy((e) => ({ ...e, stats: { ...e.stats, slotFreeDay: todayNum() } }));
     sfx('machine', .45); sfx('zap', .3);
-    setPulled(true); setTimeout(() => setPulled(false), 450);
+    pullAt.current = performance.now(); setPulled(true); setTimeout(() => setPulled(false), 450);
     setBusy(true); setSettled(false); setPitch(''); setWin(null);
     stopped.current = 0;
     setResult((prev) => prev.map((v, i) => (locks[i] ? v : Math.floor(Math.random() * REELS[i].symbols.length))));
@@ -166,7 +175,7 @@ function Machine() {
           <Btn tone="amber" size="lg" icon="play" silent onClick={spin} disabled={busy}>{busy ? 'Spinning…' : free ? 'Free spin' : 'Spin'}</Btn>
         </div>
         <button type="button" class={`lever ${pulled ? 'pulled' : ''}`} onClick={spin} disabled={busy} aria-label="Pull the lever">
-          <span class="base" /><span class="rod"><span class="knob" /></span>
+          <LeverView pulledAt={pullAt.current} />
         </button>
       </div>
 
@@ -185,5 +194,22 @@ function Machine() {
       )}
       {spinId === 0 && <p class="dim" style={{ textAlign: 'center', margin: 0 }}>Pull the lever. Hold reels you like, re-spin the rest.</p>}
     </div>
+  );
+}
+
+/** Live 3D lever: idles with a little wobble, swings down hard when pulled, springs back. */
+function LeverView({ pulledAt }: { pulledAt: number }) {
+  const at = useRef(pulledAt);
+  at.current = pulledAt;
+  return (
+    <VoxView width={52} height={190} spin="always" cacheKey="slot-lever" yaw={-0.55} pitch={0.08} fill={0.98} make={() => buildLever()}
+      animate={(o: THREE.Object3D, t: number) => {
+        const rod = (o as any).userData.rod as THREE.Object3D | undefined;
+        if (!rod) return;
+        const k = (performance.now() - at.current) / 1000;
+        let a = Math.sin(t * 2.2) * 0.04;
+        if (k >= 0 && k < 1.1) a = k < 0.16 ? (k / 0.16) * 1.9 : 1.9 * Math.exp(-(k - 0.16) * 5) * Math.cos((k - 0.16) * 14);
+        rod.rotation.x = a;
+      }} />
   );
 }

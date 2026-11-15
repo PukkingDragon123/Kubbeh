@@ -1,33 +1,26 @@
-// UFO CATCH — the arcade cabinet's one and only game. Catch falling jelly and gene
-// capsules dropped by passing UFOs, dodge the space junk. Pixel art, 3 lives.
+// UFO CATCH — the arcade cabinet's game, now a real-time 3D voxel scene. Voxel UFOs drift
+// over a voxel city and drop jelly blobs and gene capsules; Blip (the real voxel alien)
+// catches them and dodges the space junk. Same rules, score, combo and daily gene cap.
 import { useEffect, useRef, useState } from 'preact/hooks';
+import * as THREE from 'three';
 import { economy, looks, settings } from '../../core/state';
 import { sfx } from '../../core/bus';
 import { Btn, Win } from '../common/kit';
 import { earnGenes, setStatMax, bumpStat } from '../../economy/genes';
 import { checkProgress } from '../../economy/achievements';
-import { Painter, tinyAlien } from '../../economy/pixelart';
 import { LockedStation } from './Locked';
+import { buildAlien } from '../../vox/alien';
+import { studioEnvironment } from '../../vox/mesh';
+import { blob, bolt, capsule, Cubes, heart, junk, skyline, stars, street, ufo } from './vox/arcadeModels';
+import { VoxView } from './vox/VoxView';
+import { framed } from './vox/models';
 
 const W = 160, H = 120;
+const wx = (x: number) => (x - W / 2) / 10;
+const wy = (y: number) => (H / 2 - y) / 10;
 
-function sprite(w: number, h: number, draw: (p: Painter) => void) { const p = new Painter(w, h); draw(p); p.outline('#0b130d'); return p.canvas(); }
-let SPR: Record<string, HTMLCanvasElement> | null = null;
-function sprites() {
-  if (SPR) return SPR;
-  SPR = {
-    blob: sprite(9, 9, (p) => { p.blob(4, 4.5, 3.6, 3.4, '#8cf56b'); p.px(3, 4, '#0a0a0c'); p.px(5, 4, '#0a0a0c'); }),
-    pink: sprite(9, 9, (p) => { p.blob(4, 4.5, 3.6, 3.4, '#ff6fd6'); p.px(3, 4, '#0a0a0c'); p.px(5, 4, '#0a0a0c'); }),
-    gene: sprite(7, 11, (p) => { p.rect(1, 1, 5, 9, '#ffbe3d'); p.rect(1, 1, 5, 2, '#fff1a8'); p.line(2, 4, 4, 7, '#b97a10'); p.line(4, 4, 2, 7, '#b97a10'); }),
-    junk: sprite(9, 9, (p) => { p.ell(4, 4, 3.6, 3.4, '#7a8794'); p.px(2, 3, '#5f6a75'); p.px(5, 5, '#5f6a75'); p.px(3, 2, '#c4ccd3'); }),
-    bolt: sprite(9, 9, (p) => { p.rect(3, 1, 3, 6, '#9aa6b2'); p.rect(2, 1, 5, 2, '#c4ccd3'); p.px(4, 7, '#9aa6b2'); }),
-    ufo: sprite(17, 9, (p) => { p.ell(8, 3, 3.5, 2.6, '#a8f8ff', 1, (_x, y) => y <= 3); p.ell(8, 5, 8, 2.2, '#9aa6b2'); p.px(4, 5, '#ffe14d'); p.px(8, 6, '#ff6fd6'); p.px(12, 5, '#8cf56b'); }),
-  };
-  return SPR;
-}
-
-type Obj = { x: number; y: number; vy: number; kind: 'blob' | 'pink' | 'gene' | 'junk' | 'bolt'; spin: number };
-type Part = { x: number; y: number; vx: number; vy: number; life: number; c: string };
+type Kind = 'blob' | 'pink' | 'gene' | 'junk' | 'bolt';
+type Obj = { x: number; y: number; vy: number; kind: Kind; spin: number; mesh: THREE.Object3D };
 
 export function ArcadePanel({ close }: { arg: unknown; close: () => void }) {
   const owned = (economy.value.owned.arcade_cab ?? 0) > 0;
@@ -42,13 +35,16 @@ function Game() {
   const cv = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<'ready' | 'play' | 'over'>('ready');
   const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [combo, setCombo] = useState(0);
   const [earned, setEarned] = useState(0);
   const high = economy.value.stats.arcadeHigh ?? 0;
   const input = useRef({ left: false, right: false, pointerX: null as number | null });
   const stateRef = useRef(state);
   stateRef.current = state;
+  const view = useRef({ halfW: 8, halfH: 6, rect: null as DOMRect | null });
 
-  const start = () => { sfx('powerup', .5); setScore(0); setEarned(0); setState('play'); };
+  const start = () => { sfx('powerup', .5); setScore(0); setEarned(0); setLives(3); setCombo(0); setState('play'); };
 
   useEffect(() => {
     const kd = (e: KeyboardEvent) => {
@@ -65,134 +61,206 @@ function Game() {
   }, []);
 
   useEffect(() => {
-    const canvas = cv.current!; const ctx = canvas.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
-    const S = sprites();
-    const hero = tinyAlien(looks.value.find((l) => l.id === 'blip') ?? looks.value[0], 0);
-    const hero2 = tinyAlien(looks.value.find((l) => l.id === 'blip') ?? looks.value[0], 1);
-    const stars = Array.from({ length: 40 }, () => ({ x: Math.random() * W, y: Math.random() * H, s: Math.random() }));
-    const city = Array.from({ length: 14 }, (_, i) => ({ x: i * 12, h: 10 + Math.random() * 22, lit: Array.from({ length: 6 }, () => Math.random() < .4) }));
-    let px = W / 2, lives = 3, sc = 0, t = 0, spawnT = 0, shake = 0, combo = 0;
-    let objs: Obj[] = [], parts: Part[] = [];
-    const ufos = [{ x: -20, y: 10, vx: 22 }, { x: W + 40, y: 20, vx: -16 }];
+    const canvas = cv.current!;
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    } catch { return; }
+    renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.NeutralToneMapping;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#0b0724');
+    scene.fog = new THREE.Fog('#0b0724', 26, 40);
+    scene.environment = studioEnvironment(renderer, 0xb48cff);
+    scene.add(new THREE.HemisphereLight('#c8d8ff', '#1a1030', 0.9));
+    const key = new THREE.DirectionalLight('#fff0e0', 2.6); key.position.set(-4, 8, 10); scene.add(key);
+    const neon = new THREE.PointLight('#ff6fd6', 18, 18); neon.position.set(5, -3, 3); scene.add(neon);
+    const neon2 = new THREE.PointLight('#8cf56b', 14, 16); neon2.position.set(-6, -4, 3); scene.add(neon2);
+    const cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+
+    // set dressing
+    const sky = skyline(); sky.position.set(0, -5, -4.2); scene.add(sky);
+    const road = street(); road.position.set(0, -5, 0); scene.add(road);
+    const starField = stars(); scene.add(starField);
+    const moon = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4, 1), new THREE.MeshStandardMaterial({ color: '#e8e6ff', emissive: '#6a68a8', emissiveIntensity: .6, flatShading: true }));
+    moon.position.set(6.5, 4.2, -8); scene.add(moon);
+    const cubes = new Cubes(); scene.add(cubes.mesh);
+
+    // hero
+    const look = looks.value.find((l) => l.id === 'blip') ?? looks.value[0];
+    const hero = buildAlien({ ...look, hat: undefined, outfit: undefined, accessory: undefined }, 0.016);
+    hero.root.scale.setScalar(1.15);
+    scene.add(hero.root);
+
+    // UFOs with tractor beams
+    const beamMat = new THREE.MeshBasicMaterial({ color: '#a8f8ff', transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const ufos = [{ x: -20, y: 10, vx: 22 }, { x: W + 40, y: 20, vx: -16 }].map((u) => {
+      const m = ufo(); scene.add(m);
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.9, 1.8, 16, 1, true), beamMat);
+      scene.add(beam);
+      return { ...u, m, beam, beamT: 0 };
+    });
+
+    let px = W / 2, lv = 3, sc = 0, t = 0, spawnT = 0, shake = 0, cmb = 0, hitT = 0, joyT = 0;
+    let objs: Obj[] = [];
     let raf = 0, last = performance.now();
     const playing = () => stateRef.current === 'play';
+    const make = (k: Kind): THREE.Object3D => {
+      const m = k === 'blob' ? blob(0x8cf56b) : k === 'pink' ? blob(0xff6fd6) : k === 'gene' ? capsule() : k === 'junk' ? junk(Math.floor(Math.random() * 4)) : bolt();
+      const s = k === 'gene' ? 0.9 : k === 'junk' ? 1.05 : 0.95;
+      m.scale.multiplyScalar(s);
+      scene.add(m);
+      return m;
+    };
 
-    const burst = (x: number, y: number, c: string, n = 10) => { for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - .5) * 60, vy: -Math.random() * 60, life: .5 + Math.random() * .4, c }); };
+    const resize = () => {
+      const r = canvas.parentElement!.getBoundingClientRect();
+      const w = Math.max(1, r.width), h = Math.max(1, r.height);
+      renderer.setSize(w, h, false);
+      cam.aspect = w / h;
+      const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+      const dist = Math.max(6.4 / tan, 8.4 / (tan * cam.aspect));
+      cam.position.set(0, 0.9, dist); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix();
+      view.current = { halfW: dist * tan * cam.aspect, halfH: dist * tan, rect: r as DOMRect };
+    };
+    resize();
+    const ro = new ResizeObserver(resize); ro.observe(canvas.parentElement!);
+
+    const finish = (final: number) => {
+      sfx(final > (economy.value.stats.arcadeHigh ?? 0) ? 'fanfare' : 'weird', .5);
+      setStatMax('arcadeHigh', final);
+      bumpStat('arcadeGames');
+      setEarned(earnGenes(Math.floor(final / 20), `UFO Catch score ${final}`, undefined, 'arcade'));
+      checkProgress();
+    };
+    const reset = () => { lv = 3; sc = 0; cmb = 0; px = W / 2; for (const o of objs) scene.remove(o.mesh); objs = []; };
+    (canvas as any).__reset = reset;
 
     const frame = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
       const reduce = settings.value.reduceMotion;
-      // update
+      let moving = 0;
       if (playing()) {
         const speed = 90;
+        const before = px;
         if (input.current.pointerX !== null) px += Math.max(-1, Math.min(1, (input.current.pointerX - px) / 6)) * speed * dt * 1.4;
         if (input.current.left) px -= speed * dt;
         if (input.current.right) px += speed * dt;
         px = Math.max(6, Math.min(W - 6, px));
+        moving = px - before;
         spawnT -= dt;
         const level = 1 + sc / 250;
         if (spawnT <= 0) {
           spawnT = Math.max(0.28, 0.9 - level * 0.08);
           const u = ufos[Math.floor(Math.random() * ufos.length)];
           const r = Math.random();
-          const kind: Obj['kind'] = r < 0.07 ? 'gene' : r < 0.42 ? 'blob' : r < 0.55 ? 'pink' : r < 0.8 ? 'junk' : 'bolt';
+          const kind: Kind = r < 0.07 ? 'gene' : r < 0.42 ? 'blob' : r < 0.55 ? 'pink' : r < 0.8 ? 'junk' : 'bolt';
           const x = u.x > 4 && u.x < W - 4 ? u.x : 10 + Math.random() * (W - 20);
-          objs.push({ x, y: u.y + 4, vy: 26 + level * 10 + Math.random() * 12, kind, spin: Math.random() * 6 });
+          if (u.x > 4 && u.x < W - 4) u.beamT = 0.5;
+          objs.push({ x, y: u.y + 4, vy: 26 + level * 10 + Math.random() * 12, kind, spin: Math.random() * 6, mesh: make(kind) });
         }
         for (const o of objs) { o.y += o.vy * dt; o.spin += dt * 4; }
-        // catch
         objs = objs.filter((o) => {
           if (o.y > H - 18 && o.y < H - 6 && Math.abs(o.x - px) < 8) {
+            scene.remove(o.mesh);
             if (o.kind === 'junk' || o.kind === 'bolt') {
-              lives -= 1; combo = 0; shake = 0.35; sfx('error', .45); burst(o.x, o.y, '#c4ccd3', 14);
-              if (lives <= 0) { setState('over'); finish(sc); }
+              lv -= 1; cmb = 0; shake = 0.35; hitT = 0.8; sfx('error', .45); cubes.burst(wx(o.x), wy(o.y), 0xc4ccd3, 18, 5);
+              setLives(lv); setCombo(0);
+              if (lv <= 0) { setState('over'); finish(sc); }
             } else {
-              combo += 1;
-              const pts = (o.kind === 'gene' ? 25 : o.kind === 'pink' ? 15 : 10) * (1 + Math.min(4, Math.floor(combo / 5)));
-              sc += pts; setScore(sc);
-              sfx(o.kind === 'gene' ? 'coin' : 'plop', .4, 1 + Math.min(.6, combo * .03));
-              burst(o.x, o.y, o.kind === 'gene' ? '#ffbe3d' : o.kind === 'pink' ? '#ff6fd6' : '#8cf56b');
+              cmb += 1;
+              const pts = (o.kind === 'gene' ? 25 : o.kind === 'pink' ? 15 : 10) * (1 + Math.min(4, Math.floor(cmb / 5)));
+              sc += pts; setScore(sc); setCombo(cmb);
+              if (o.kind === 'gene') joyT = 0.7;
+              sfx(o.kind === 'gene' ? 'coin' : 'plop', .4, 1 + Math.min(.6, cmb * .03));
+              cubes.burst(wx(o.x), wy(o.y), o.kind === 'gene' ? 0xffbe3d : o.kind === 'pink' ? 0xff6fd6 : 0x8cf56b, 14);
             }
             return false;
           }
-          return o.y < H + 10;
+          if (o.y >= H + 10) { scene.remove(o.mesh); return false; }
+          return true;
         });
       }
-      for (const u of ufos) { u.x += u.vx * dt * (reduce ? .3 : 1); if (u.x > W + 30) { u.x = -30; u.y = 6 + Math.random() * 16; } if (u.x < -30) { u.x = W + 30; u.y = 6 + Math.random() * 16; } }
-      parts = parts.filter((p) => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 140 * dt; return p.life > 0; });
-      shake = Math.max(0, shake - dt);
-
-      // draw
-      ctx.save();
-      if (shake > 0 && !reduce) ctx.translate(Math.round((Math.random() - .5) * 4), Math.round((Math.random() - .5) * 4));
-      const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0a0620'); g.addColorStop(1, '#16304a');
-      ctx.fillStyle = g; ctx.fillRect(-4, -4, W + 8, H + 8);
-      for (const s of stars) { ctx.fillStyle = s.s > .7 && Math.sin(t * 3 + s.x) > 0 ? '#ffffff' : '#7a86c8'; ctx.fillRect(s.x | 0, s.y | 0, 1, 1); }
-      for (const b of city) {
-        ctx.fillStyle = '#0e1a26'; ctx.fillRect(b.x, H - 10 - b.h, 11, b.h);
-        b.lit.forEach((l, i) => { if (l) { ctx.fillStyle = i % 3 ? '#ffbe3d' : '#ff6fd6'; ctx.fillRect(b.x + 2 + (i % 2) * 5, H - 6 - b.h + Math.floor(i / 2) * 6, 2, 2); } });
-      }
-      ctx.fillStyle = '#1d2a22'; ctx.fillRect(0, H - 10, W, 10);
-      ctx.fillStyle = '#8cf56b'; ctx.fillRect(0, H - 10, W, 1);
       for (const u of ufos) {
-        ctx.globalAlpha = .22 + Math.sin(t * 8) * .08; ctx.fillStyle = '#a8f8ff'; ctx.beginPath(); ctx.moveTo(u.x - 3, u.y + 6); ctx.lineTo(u.x + 3, u.y + 6); ctx.lineTo(u.x + 7, u.y + 22); ctx.lineTo(u.x - 7, u.y + 22); ctx.fill(); ctx.globalAlpha = 1;
-        ctx.drawImage(S.ufo, Math.round(u.x - 8), Math.round(u.y - 4 + Math.sin(t * 4 + u.x) * 1.5));
+        u.x += u.vx * dt * (reduce ? .3 : 1);
+        if (u.x > W + 30) { u.x = -30; u.y = 6 + Math.random() * 16; }
+        if (u.x < -30) { u.x = W + 30; u.y = 6 + Math.random() * 16; }
+        u.beamT = Math.max(0, u.beamT - dt);
+        const bob = reduce ? 0 : Math.sin(t * 3 + u.x * 0.1) * 0.12;
+        u.m.position.set(wx(u.x), wy(u.y) + bob, 0);
+        u.m.rotation.set(0.25, t * 1.4, Math.sin(t * 2 + u.x) * 0.08);
+        u.beam.visible = u.beamT > 0 || (playing() && Math.sin(t * 0.8 + u.x * 0.05) > 0.7);
+        u.beam.position.set(wx(u.x), wy(u.y) - 1.05 + bob, 0);
+        beamMat.opacity = 0.12 + Math.sin(t * 9) * 0.04;
       }
-      for (const o of objs) { const im = S[o.kind]; ctx.drawImage(im, Math.round(o.x - im.width / 2), Math.round(o.y - im.height / 2)); }
-      const bob = playing() ? Math.abs(Math.sin(t * 12)) * 2 : Math.sin(t * 3);
-      ctx.drawImage(Math.sin(t * 12) > 0 ? hero : hero2, Math.round(px - 6), Math.round(H - 23 - bob));
-      for (const p of parts) { ctx.globalAlpha = Math.max(0, p.life * 2); ctx.fillStyle = p.c; ctx.fillRect(p.x | 0, p.y | 0, 1, 1); }
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = '#ffffff'; ctx.font = '8px "Pixelify Sans", monospace'; ctx.fillText(`${sc}`, 4, 10);
-      for (let i = 0; i < 3; i++) { ctx.fillStyle = i < lives ? '#ff6fd6' : '#3a2a3a'; ctx.fillRect(W - 8 - i * 7, 4, 5, 5); }
-      if (combo >= 5) { ctx.fillStyle = '#ffbe3d'; ctx.fillText(`x${1 + Math.min(4, Math.floor(combo / 5))}`, 4, 20); }
-      ctx.restore();
+      for (const o of objs) {
+        o.mesh.position.set(wx(o.x), wy(o.y), 0);
+        o.mesh.rotation.set(o.kind === 'junk' || o.kind === 'bolt' ? o.spin : 0, o.spin * (o.kind === 'gene' ? 1.2 : 0.6), o.kind === 'bolt' ? o.spin * 0.7 : 0);
+      }
+      // hero: run, bob, squash, face
+      const step = playing() && Math.abs(moving) > 0.05;
+      const bob = reduce ? 0 : step ? Math.abs(Math.sin(t * 14)) * 0.18 : Math.sin(t * 3) * 0.04;
+      hero.root.position.set(wx(px), -5 + bob, 0.4);
+      const targetYaw = step ? (moving > 0 ? 0.9 : -0.9) : 0;
+      hero.root.rotation.y += (targetYaw - hero.root.rotation.y) * Math.min(1, dt * 10);
+      const sq = reduce ? 1 : 1 + Math.sin(t * (step ? 14 : 3)) * (step ? 0.05 : 0.02);
+      hero.jelly.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
+      hero.legL.rotation.x = step ? Math.sin(t * 14) * 0.7 : 0;
+      hero.legR.rotation.x = step ? -Math.sin(t * 14) * 0.7 : 0;
+      hero.armL.rotation.z = step ? 0.4 + Math.sin(t * 14) * 0.3 : 0.15;
+      hero.armR.rotation.z = step ? -0.4 - Math.sin(t * 14) * 0.3 : -0.15;
+      hitT = Math.max(0, hitT - dt); joyT = Math.max(0, joyT - dt);
+      const over = stateRef.current === 'over';
+      hero.setFace(over ? 'cry' : hitT > 0 ? 'shocked' : joyT > 0 ? 'love' : playing() ? (cmb >= 5 ? 'tongue' : 'focused') : (Math.sin(t * 0.9) > 0.97 ? 'blink' : 'happy'));
+
+      starField.rotation.z = reduce ? 0 : Math.sin(t * 0.05) * 0.02;
+      cubes.update(dt);
+      shake = Math.max(0, shake - dt);
+      const sx = shake > 0 && !reduce ? (Math.random() - .5) * 0.3 : 0, sy = shake > 0 && !reduce ? (Math.random() - .5) * 0.3 : 0;
+      cam.position.x = sx; cam.position.y = 0.9 + sy;
+      renderer.render(scene, cam);
       raf = requestAnimationFrame(frame);
     };
-    const finish = (final: number) => {
-      sfx(final > (economy.value.stats.arcadeHigh ?? 0) ? 'fanfare' : 'weird', .5);
-      setStatMax('arcadeHigh', final);
-      bumpStat('arcadeGames');
-      const g = earnGenes(Math.floor(final / 20), `UFO Catch score ${final}`, undefined, 'arcade');
-      setEarned(g);
-      checkProgress();
-    };
-    const onStart = () => { lives = 3; sc = 0; objs = []; parts = []; combo = 0; px = W / 2; };
-    (canvas as any).__reset = onStart;
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf); ro.disconnect();
+      renderer.dispose(); scene.clear();
+    };
   }, []);
 
   useEffect(() => { if (state === 'play') (cv.current as any)?.__reset?.(); }, [state]);
 
   const toLocalX = (e: PointerEvent) => {
     const r = cv.current!.getBoundingClientRect();
-    const scale = Math.min(r.width / W, r.height / H);
-    const ox = (r.width - W * scale) / 2;
-    return (e.clientX - r.left - ox) / scale;
+    const ndc = ((e.clientX - r.left) / r.width) * 2 - 1;
+    return (ndc * view.current.halfW) * 10 + W / 2;
   };
 
   return (
     <div class="arcade-cab">
-      <div class="arcade-screen screen"
+      <div class="arcade-screen screen no-scan"
         onPointerDown={(e) => { input.current.pointerX = toLocalX(e as unknown as PointerEvent); if (state !== 'play') start(); }}
         onPointerMove={(e) => { if ((e as PointerEvent).buttons || (e as PointerEvent).pointerType === 'mouse') input.current.pointerX = toLocalX(e as unknown as PointerEvent); }}
         onPointerLeave={() => { input.current.pointerX = null; }}>
-        <canvas ref={cv} width={W} height={H} class="pixelated" style={{ objectFit: 'contain' }} />
+        <canvas ref={cv} />
+        <div class="arcade-hud">
+          <span class="arcade-score tnum">{score}</span>
+          {combo >= 5 && <span class="arcade-combo">×{1 + Math.min(4, Math.floor(combo / 5))}</span>}
+          <span class="arcade-lives">{[0, 1, 2].map((i) => <VoxView key={i} size={26} cacheKey={`arcade-heart:${i < lives}`} make={() => framed(heart())} class={i < lives ? '' : 'lost'} yaw={-0.2} pitch={0.1} fill={0.98} />)}</span>
+        </div>
         {state !== 'play' && (
           <div class="arcade-overlay">
-            <h3 class="glow-p" style={{ fontSize: '28px' }}>{state === 'over' ? 'GAME OVER' : 'UFO CATCH'}</h3>
-            {state === 'over' ? <div class="col gap-4"><span class="px glow-g" style={{ fontSize: '20px' }}>Score {score}</span><span class="dim">High score {Math.max(high, score)} · +{earned} genes</span></div>
-              : <span class="dim">Catch jelly & gene capsules · dodge junk<br />←/→ or A/D · or drag</span>}
-            <Btn tone="pink" size="lg" icon="play" onClick={start}>{state === 'over' ? 'Play again' : 'Insert coin'}</Btn>
-            <span class="dimmer" style={{ fontSize: '11px' }}>Genes from the arcade are capped at 40 a day</span>
+            <h3 class="arcade-title">{state === 'over' ? 'GAME OVER' : 'UFO CATCH'}</h3>
+            {state === 'over' ? <div class="col gap-4"><span class="arcade-big tnum">{score}</span><span class="dim">HI {Math.max(high, score)} · +{earned} genes</span></div>
+              : <span class="dim">←/→ · A/D · drag</span>}
+            <Btn tone="pink" size="lg" icon="play" onClick={start}>{state === 'over' ? 'Again' : 'Play'}</Btn>
           </div>
         )}
       </div>
-      <div class="row between" style={{ color: '#d8ccff', fontSize: '12px' }}>
-        <span class="px">HI {high}</span>
-        <span class="px">SCORE {score}</span>
+      <div class="row between arcade-foot">
+        <span>HI {high}</span>
+        <span class="dimmer">genes capped at 40/day</span>
       </div>
     </div>
   );

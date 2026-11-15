@@ -188,7 +188,11 @@ button.ws-stat:hover { transform: translateY(-2px); }
 .fuel-grid { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 18px; padding: 4px 10px 12px; min-height: 0; }
 @media (max-width: 760px) { .fuel-grid { grid-template-columns: minmax(0, 1fr); } }
 .fuel-left { align-items: center; position: sticky; top: 0; align-self: start; }
-.fuel-tank { width: 100%; max-width: 240px; height: auto; filter: drop-shadow(0 10px 30px #000a); }
+.fuel-tank3d { position: relative; width: 100%; max-width: 280px; aspect-ratio: 3 / 4; align-self: center; border-radius: 18px;
+  background: radial-gradient(ellipse at 50% 70%, #12303a, transparent 70%); }
+.fuel-tank3d canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.fuel-tank3d .fuel-pct { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); font-size: 16px; padding: 4px 12px 5px; }
+.fuel-marks { position: absolute; right: -4px; top: 18%; bottom: 22%; display: flex; flex-direction: column; justify-content: space-around; gap: 4px; pointer-events: none; }
 .fuel-bars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; height: 110px; align-items: end; }
 .fuel-bar { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; font-size: 10px; color: var(--text-3); }
 .fuel-bar i { display: block; width: 100%; border-radius: 4px 4px 2px 2px; background: linear-gradient(180deg, var(--glob), var(--glob-deep)); box-shadow: 0 0 8px #8cf56b44; min-height: 2px; }

@@ -15,7 +15,7 @@ import { framed } from '../shop/vox/models';
 
 const POKES = ['Hey! That tickles.', 'I am 94% jelly, please be gentle.', 'Ideas incoming…', 'Blorp.', 'Careful, I bruise purple.'];
 
-export function GlorpPortrait({ onPoke, size = 96 }: { onPoke?: (line: string) => void; size?: number }) {
+export function GlorpPortrait({ onPoke, size = 112 }: { onPoke?: (line: string) => void; size?: number }) {
   const parts = useRef<AlienParts | null>(null);
   const flash = useRef<{ e: Face; until: number } | null>(null);
   const hop = useRef(0);

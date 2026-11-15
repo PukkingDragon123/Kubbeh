@@ -210,7 +210,7 @@ export class WidgetScene {
     }
     this.tank.g.position.set(3.55, 0, -0.35);
     this.scene.add(this.tank.g);
-    this.bar.g.position.set(-0.2, 0.06, 1.05);
+    this.bar.g.position.set(-0.2, 0.06, 1.15);
     this.bar.g.scale.setScalar(0.8);
     this.scene.add(this.bar.g);
     for (let i = 0; i < 2; i++) {
@@ -226,8 +226,8 @@ export class WidgetScene {
     this.renderer.setSize(w, h, false);
     this.cam.aspect = w / h;
     const tan = Math.tan(THREE.MathUtils.degToRad(this.cam.fov / 2));
-    const dist = Math.max(1.7 / tan, 4.4 / (tan * this.cam.aspect));
-    this.cam.position.set(0, 1.9, dist); this.cam.lookAt(0, 0.85, 0); this.cam.updateProjectionMatrix();
+    const dist = Math.max(1.32 / tan, 4.05 / (tan * this.cam.aspect));
+    this.cam.position.set(0.2, 1.55, dist); this.cam.lookAt(0.2, 0.95, 0); this.cam.updateProjectionMatrix();
   }
 
   private agentFor(m: CrewMember, lk: AlienLook | undefined, i: number): Agent | null {
@@ -236,7 +236,7 @@ export class WidgetScene {
     let a = this.agents.get(m.id);
     if (a && a.lookKey !== lookKey) { this.scene.remove(a.parts.root); this.agents.delete(m.id); a = undefined; }
     if (!a) {
-      const parts = buildAlien({ ...lk, hat: undefined, outfit: undefined, accessory: undefined }, 0.0095);
+      const parts = buildAlien({ ...lk, hat: undefined, outfit: undefined, accessory: undefined }, 0.0125);
       const carry = once('crate', () => {
         const v = VoxGrid.span([-5, 0, -4], [5, 7, 4], 1);
         v.add(S.box([-4.5, 0, -3.5], [4.5, 6.5, 3.5], 0.6), (x, y, z) => grain(0xc9a26a, x, y, z), M.solid);
@@ -244,7 +244,7 @@ export class WidgetScene {
         return toObject(v, { size: 0.03, anchor: 'center', outline: 0x2a1a0a });
       });
       carry.visible = false;
-      carry.position.set(0, 0.9, 0.18);
+      carry.position.set(0, 1.12, 0.2);
       parts.root.add(carry);
       const x = m.role === 'clone' ? STATION_X.vat : -3 + (i % 6) * 1.1;
       a = { parts, x, tx: x, dir: 1, walk: 0, wanderAt: 0, carry, born: performance.now(), lookKey };
